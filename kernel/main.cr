@@ -79,7 +79,6 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*) : NoReturn
   Serial.write("[Kristal] Loading userspace ELF\n")
   entry = ELF.load(Pointer(UInt8).new(file[1]), file[2])
   panic("ELF mapping self test") if Memory.lookup(entry) & Memory::NX != 0
-  Serial.write("[Kristal] ELF loaded\n")
-  Arch.debug_exit(0x10_u32)
-  Arch.stop
+  Serial.write("[Kristal] Entering Ring 3\n")
+  Arch.enter_user(entry, ELF::STACK)
 end

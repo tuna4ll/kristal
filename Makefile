@@ -48,7 +48,7 @@ run: all
 
 test: all
 	@status=0; timeout 15s $(QEMU) -cdrom build/kristal.iso > build/serial.log 2>&1 || status=$$?; cat build/serial.log; test $$status -eq 33
-	grep -q 'ELF loaded' build/serial.log
+	grep -q 'Ring 3 verified by exception frame' build/serial.log
 
 feasibility:
 	scripts/feasibility.sh
