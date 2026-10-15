@@ -52,3 +52,84 @@ port_in:
     in al, dx
     ret
 section .note.GNU-stack noalloc noexec nowrite progbits
+section .bss
+align 16
+fault_stack: resb 16384
+fault_stack_top:
+section .text
+global read_cr3, write_cr3, cpu_load, stack_address, fault_stack_address, interrupt_address, read_cr2
+read_cr3:
+    mov rax, cr3
+    ret
+write_cr3:
+    mov cr3, rdi
+    ret
+read_cr2:
+    mov rax, cr2
+    ret
+stack_address:
+    lea rax, [stack_top]
+    ret
+fault_stack_address:
+    lea rax, [fault_stack_top]
+    ret
+cpu_load:
+    sub rsp, 16
+    mov word [rsp], 55
+    mov [rsp + 2], rdi
+    lgdt [rsp]
+    mov word [rsp], 4095
+    mov [rsp + 2], rsi
+    lidt [rsp]
+    add rsp, 16
+    push 8
+    lea rax, [.reload]
+    push rax
+    retfq
+.reload:
+    mov ax, 16
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    xor eax, eax
+    mov fs, ax
+    mov gs, ax
+    mov ax, 40
+    ltr ax
+    mov ecx, 0xc0000080
+    rdmsr
+    or eax, 1 << 11
+    wrmsr
+    mov rax, cr0
+    or rax, 1 << 16
+    mov cr0, rax
+    ret
+interrupt_address:
+    lea rax, [interrupts]
+    mov rax, [rax + rdi * 8]
+    ret
+extern exception
+%assign n 0
+%rep 256
+isr_%+n:
+%if n != 8 && n != 10 && n != 11 && n != 12 && n != 13 && n != 14 && n != 17 && n != 21 && n != 29 && n != 30
+    push 0
+%endif
+    push n
+    jmp fault_entry
+%assign n n+1
+%endrep
+fault_entry:
+    cld
+    mov rdi, rsp
+    and rsp, -16
+    call exception
+    jmp stop
+section .rodata
+align 8
+interrupts:
+%assign n 0
+%rep 256
+    dq isr_%+n
+%assign n n+1
+%endrep

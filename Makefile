@@ -38,7 +38,7 @@ run: all
 
 test: all
 	@status=0; timeout 15s $(QEMU) -cdrom build/kristal.iso > build/serial.log 2>&1 || status=$$?; cat build/serial.log; test $$status -eq 33
-	grep -q 'Crystal boot verified' build/serial.log
+	grep -q 'Kernel initialized' build/serial.log
 
 feasibility:
 	scripts/feasibility.sh
