@@ -7,6 +7,7 @@ lib Arch
   fun stop : NoReturn
 end
 
+require "./elf/loader"
 require "./memory/pages"
 require "./arch/x86_64/cpu"
 
@@ -72,11 +73,13 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*) : NoReturn
   Memory.init(hhdm[1], memmap)
   CPU.init
   Memory.address_space
-  p = Memory.page
-  Memory.map(0x400000_u64, p, Memory::NX | 2_u64)
-  Pointer(UInt64).new(0x400000_u64).value = 0x1234_u64
-  panic("paging self test") if Memory.ptr(p).value != 0x1234_u64
   Serial.write("[Kristal] Kernel initialized\n")
+  panic("missing userspace module") if modules.address == 0 || modules[1] != 1
+  file = Pointer(UInt64).new(Pointer(UInt64).new(modules[2])[0])
+  Serial.write("[Kristal] Loading userspace ELF\n")
+  entry = ELF.load(Pointer(UInt8).new(file[1]), file[2])
+  panic("ELF mapping self test") if Memory.lookup(entry) & Memory::NX != 0
+  Serial.write("[Kristal] ELF loaded\n")
   Arch.debug_exit(0x10_u32)
   Arch.stop
 end

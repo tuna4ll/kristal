@@ -24,9 +24,19 @@ build/kernel.elf: build/kernel.o build/entry.o linker/kernel.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/kernel.ld build/entry.o build/kernel.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/kristal.iso: build/kernel.elf limine.conf vendor/limine/limine
+build/user.o: userspace/init/main.cr runtime/base.cr scripts/compile.sh | build
+	scripts/compile.sh userspace/init/main.cr build/user small
+
+build/user-entry.o: userspace/init/entry.asm | build
+	nasm -f elf64 $< -o $@
+
+build/init.elf: build/user.o build/user-entry.o linker/user.ld
+	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/user.o -o $@
+	test -z "$$(nm -u $@)"
+
+build/kristal.iso: build/init.elf build/kernel.elf limine.conf vendor/limine/limine
 	mkdir -p build/iso/boot/limine build/iso/EFI/BOOT
-	cp build/kernel.elf build/iso/boot/
+	cp build/kernel.elf build/init.elf build/iso/boot/
 	cp limine.conf build/iso/boot/limine/
 	cp vendor/limine/limine-bios.sys vendor/limine/limine-bios-cd.bin vendor/limine/limine-uefi-cd.bin build/iso/boot/limine/
 	cp vendor/limine/BOOTX64.EFI build/iso/EFI/BOOT/
@@ -38,7 +48,7 @@ run: all
 
 test: all
 	@status=0; timeout 15s $(QEMU) -cdrom build/kristal.iso > build/serial.log 2>&1 || status=$$?; cat build/serial.log; test $$status -eq 33
-	grep -q 'Kernel initialized' build/serial.log
+	grep -q 'ELF loaded' build/serial.log
 
 feasibility:
 	scripts/feasibility.sh
