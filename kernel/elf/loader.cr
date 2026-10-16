@@ -1,6 +1,6 @@
 module ELF
-  MIN = 0x10000_u64
-  MAX = 0x70000000_u64
+  MIN   =    0x10000_u64
+  MAX   = 0x70000000_u64
   STACK = 0x7ffff000_u64
 
   def self.number(data : UInt8*, offset : UInt64, width : Int32) : UInt64
@@ -60,7 +60,6 @@ module ELF
         total = total &+ memsz
         panic("ELF too large") if total > 16_u64 << 20
         if memsz != 0
-          finish = address &+ memsz
           executable = true if flags & 1 != 0 && entry >= address && entry < address &+ filesz
           pos = 0_u64
           while pos < memsz

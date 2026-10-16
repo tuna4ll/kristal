@@ -1,5 +1,5 @@
 module Memory
-  PAGE = 4096_u64
+  PAGE =               4096_u64
   MASK = 0x000ffffffffff000_u64
   NX   = 0x8000000000000000_u64
   @@offset = 0_u64

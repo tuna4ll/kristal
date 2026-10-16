@@ -34,23 +34,14 @@ build/init.elf: build/user.o build/user-entry.o linker/user.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/user.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/kristal.iso: build/init.elf build/kernel.elf limine.conf vendor/limine/limine
-	mkdir -p build/iso/boot/limine build/iso/EFI/BOOT
-	cp build/kernel.elf build/init.elf build/iso/boot/
-	cp limine.conf build/iso/boot/limine/
-	cp vendor/limine/limine-bios.sys vendor/limine/limine-bios-cd.bin vendor/limine/limine-uefi-cd.bin build/iso/boot/limine/
-	cp vendor/limine/BOOTX64.EFI build/iso/EFI/BOOT/
-	xorriso -as mkisofs -R -r -J -b boot/limine/limine-bios-cd.bin -no-emul-boot -boot-load-size 4 -boot-info-table -hfsplus -apm-block-size 2048 --efi-boot boot/limine/limine-uefi-cd.bin -efi-boot-part --efi-boot-image --protective-msdos-label build/iso -o $@ 2>build/iso.log
-	vendor/limine/limine bios-install $@
+build/kristal.iso: build/init.elf build/kernel.elf limine.conf vendor/limine/limine scripts/image.sh
+	scripts/image.sh build/kernel.elf build/init.elf $@ >build/iso.log 2>&1
 
 run: all
-	$(QEMU) -cdrom build/kristal.iso
+	@status=0; $(QEMU) -cdrom build/kristal.iso || status=$$?; if [ $$status -ne 33 ]; then exit $$status; fi
 
 test: all
-	@status=0; timeout 15s $(QEMU) -cdrom build/kristal.iso > build/serial.log 2>&1 || status=$$?; cat build/serial.log; test $$status -eq 33
-	grep -q 'Syscall from CPL 3' build/serial.log
-	grep -q '^Hello World from Userspace$$' build/serial.log
-	grep -q 'Userspace exited status=0000000000000000' build/serial.log
+	python3 tests/run.py
 
 feasibility:
 	scripts/feasibility.sh
