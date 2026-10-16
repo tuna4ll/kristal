@@ -7,3 +7,11 @@ _user_start:
     call user_main
     ud2
 section .note.GNU-stack noalloc noexec nowrite progbits
+section .text
+global invoke
+invoke:
+    mov rax, rdi
+    mov rdi, rsi
+    mov rsi, rdx
+    int 0x80
+    ret

@@ -48,7 +48,9 @@ run: all
 
 test: all
 	@status=0; timeout 15s $(QEMU) -cdrom build/kristal.iso > build/serial.log 2>&1 || status=$$?; cat build/serial.log; test $$status -eq 33
-	grep -q 'Ring 3 verified by exception frame' build/serial.log
+	grep -q 'Syscall from CPL 3' build/serial.log
+	grep -q '^Hello World from Userspace$$' build/serial.log
+	grep -q 'Userspace exited status=0000000000000000' build/serial.log
 
 feasibility:
 	scripts/feasibility.sh

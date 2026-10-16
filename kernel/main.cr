@@ -7,6 +7,7 @@ lib Arch
   fun stop : NoReturn
 end
 
+require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
 require "./arch/x86_64/cpu"

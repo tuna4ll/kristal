@@ -29,7 +29,7 @@ module CPU
     while i < 256
       address = Arch.interrupt_address(i)
       ist = i == 8 ? 1_u64 : 0_u64
-      gate = i == 3 ? 0xee_u64 : 0x8e_u64
+      gate = i == 128 ? 0xee_u64 : 0x8e_u64
       idt[i &* 2] = (address & 0xffff) | (8_u64 << 16) | (ist << 32) | (gate << 40) | (((address >> 16) & 0xffff) << 48)
       idt[(i &* 2) &+ 1] = address >> 32
       i = i &+ 1
@@ -39,11 +39,6 @@ module CPU
 end
 
 fun exception(frame : UInt64*) : NoReturn
-  if frame[0] == 3 && frame[3] == 0x23
-    Serial.write("[Kristal] Ring 3 verified by exception frame\n")
-    Arch.debug_exit(0x10_u32)
-    Arch.stop
-  end
   Serial.write("[Kristal] Exception vector=")
   Serial.hex(frame[0])
   Serial.write(" error=")
