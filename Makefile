@@ -2,7 +2,7 @@ SHELL := /bin/sh
 LIMINE_COMMIT := aad3edd370955449717a334f0289dee10e2c5f01
 QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display gtk -vga std -serial stdio -monitor none -no-reboot
 
-.PHONY: all run test clean feasibility
+.PHONY: all run clean feasibility
 all: build/kristal.iso
 
 build:
@@ -39,10 +39,6 @@ build/kristal.iso: build/init.elf build/kernel.elf limine.conf vendor/limine/lim
 
 run: all
 	$(QEMU) -cdrom build/kristal.iso
-
-test: all
-	python3 tests/run.py
-	python3 tests/display.py
 
 feasibility:
 	scripts/feasibility.sh
