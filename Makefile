@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 LIMINE_COMMIT := aad3edd370955449717a334f0289dee10e2c5f01
-QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display none -serial stdio -monitor none -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04
+QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display gtk -vga std -serial stdio -monitor none -no-reboot
 
 .PHONY: all run test clean feasibility
 all: build/kristal.iso
@@ -17,7 +17,7 @@ vendor/limine/limine:
 build/kernel.o: $(shell find kernel runtime -name '*.cr') scripts/compile.sh | build
 	scripts/compile.sh kernel/main.cr build/kernel kernel
 
-build/entry.o: kernel/arch/x86_64/entry.asm | build
+build/entry.o: kernel/arch/x86_64/entry.asm kernel/console/font.bin | build
 	nasm -f elf64 $< -o $@
 
 build/kernel.elf: build/kernel.o build/entry.o linker/kernel.ld
@@ -38,10 +38,11 @@ build/kristal.iso: build/init.elf build/kernel.elf limine.conf vendor/limine/lim
 	scripts/image.sh build/kernel.elf build/init.elf $@ >build/iso.log 2>&1
 
 run: all
-	@status=0; $(QEMU) -cdrom build/kristal.iso || status=$$?; if [ $$status -ne 33 ]; then exit $$status; fi
+	$(QEMU) -cdrom build/kristal.iso
 
 test: all
 	python3 tests/run.py
+	python3 tests/display.py
 
 feasibility:
 	scripts/feasibility.sh

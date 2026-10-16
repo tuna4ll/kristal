@@ -7,6 +7,7 @@ lib Arch
   fun stop : NoReturn
 end
 
+require "./console/framebuffer"
 require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
@@ -21,14 +22,14 @@ def store64(p : UInt8*, offset : Int32, value : UInt64)
 end
 
 def panic(message : String) : NoReturn
-  Serial.write("[Kristal] Panic: ")
-  Serial.write(message)
-  Serial.write("\n")
+  Console.write("[Kristal] Panic: ")
+  Console.write(message)
+  Console.write("\n")
   Arch.debug_exit(0x11_u32)
   Arch.stop
 end
 
-module Serial
+module Console
   def self.hex(value : UInt64)
     digits = "0123456789abcdef".to_unsafe
     shift = 60
@@ -52,6 +53,7 @@ module Serial
     while Arch.port_in(0x3fd_u16) & 0x20 == 0
     end
     Arch.port_out(0x3f8_u16, value)
+    Framebuffer.byte(value)
   end
 
   def self.write(text : String)
@@ -64,22 +66,23 @@ module Serial
   end
 end
 
-fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*) : NoReturn
-  Serial.init
-  Serial.write("[Kristal] Booting...\n")
+fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer : UInt64*) : NoReturn
+  Console.init
+  Framebuffer.init(framebuffer)
+  Console.write("[Kristal] Booting...\n")
   if hhdm.address == 0 || memmap.address == 0
-    Serial.write("[Kristal] Missing Limine response\n")
+    Console.write("[Kristal] Missing Limine response\n")
     Arch.stop
   end
   Memory.init(hhdm[1], memmap)
   CPU.init
   Memory.address_space
-  Serial.write("[Kristal] Kernel initialized\n")
+  Console.write("[Kristal] Kernel initialized\n")
   panic("missing userspace module") if modules.address == 0 || modules[1] != 1
   file = Pointer(UInt64).new(Pointer(UInt64).new(modules[2])[0])
-  Serial.write("[Kristal] Loading userspace ELF\n")
+  Console.write("[Kristal] Loading userspace ELF\n")
   entry = ELF.load(Pointer(UInt8).new(file[1]), file[2])
   panic("ELF mapping self test") if Memory.lookup(entry) & Memory::NX != 0
-  Serial.write("[Kristal] Entering Ring 3\n")
+  Console.write("[Kristal] Entering Ring 3\n")
   Arch.enter_user(entry, ELF::STACK)
 end

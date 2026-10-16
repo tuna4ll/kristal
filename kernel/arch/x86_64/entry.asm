@@ -12,6 +12,7 @@ base_revision: dq 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc, 3
 request hhdm, 0x48dcf1cb8ad2b852, 0x63984e959a98244b
 request memmap, 0x67cf3d9d378a806f, 0xe304acdfc50c3c62
 request modules, 0x3e7e279702be32af, 0xca1c4f3bd1280cee
+request framebuffer, 0x9d5827dcd881dd75, 0xa3148604f6fab11b
 section .limine_requests_end
     dq 0xadc0e0531bb10d03, 0x9572709f31764c62
 section .bss
@@ -31,6 +32,7 @@ _start:
     mov rdi, [hhdm + 40]
     mov rsi, [memmap + 40]
     mov rdx, [modules + 40]
+    mov rcx, [framebuffer + 40]
     call kernel_main
 stop:
     cli
@@ -203,3 +205,11 @@ syscall_entry:
     pop rbx
     pop rax
     iretq
+
+section .rodata
+font: incbin "kernel/console/font.bin"
+section .text
+global font_address
+font_address:
+    lea rax, [font]
+    ret

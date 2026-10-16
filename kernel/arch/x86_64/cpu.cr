@@ -39,17 +39,17 @@ module CPU
 end
 
 fun exception(frame : UInt64*) : NoReturn
-  Serial.write("[Kristal] Exception vector=")
-  Serial.hex(frame[0])
-  Serial.write(" error=")
-  Serial.hex(frame[1])
-  Serial.write(" rip=")
-  Serial.hex(frame[2])
-  Serial.write(" cs=")
-  Serial.hex(frame[3])
-  Serial.write(" cr2=")
-  Serial.hex(Arch.read_cr2)
-  Serial.write("\n")
+  Console.write("[Kristal] Exception vector=")
+  Console.hex(frame[0])
+  Console.write(" error=")
+  Console.hex(frame[1])
+  Console.write(" rip=")
+  Console.hex(frame[2])
+  Console.write(" cs=")
+  Console.hex(frame[3])
+  Console.write(" cr2=")
+  Console.hex(Arch.read_cr2)
+  Console.write("\n")
   Arch.debug_exit(0x11_u32)
   Arch.stop
 end

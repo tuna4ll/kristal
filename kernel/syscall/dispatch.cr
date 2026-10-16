@@ -4,7 +4,7 @@ module Syscalls
   def self.dispatch(frame : UInt64*)
     panic("syscall privilege") if frame[16] != 0x23 || frame[19] != 0x1b || frame[17] & 0x3000 != 0
     unless @@seen
-      Serial.write("[Kristal] Syscall from CPL 3\n")
+      Console.write("[Kristal] Syscall from CPL 3\n")
       @@seen = true
     end
     if frame[14] == 1
@@ -34,14 +34,14 @@ module Syscalls
       p = Pointer(UInt8).new(address)
       i = 0_u64
       while i < length
-        Serial.byte(p[i])
+        Console.byte(p[i])
         i = i &+ 1
       end
       frame[14] = length
     elsif frame[14] == 2
-      Serial.write("[Kristal] Userspace exited status=")
-      Serial.hex(frame[9])
-      Serial.write("\n")
+      Console.write("[Kristal] Userspace exited status=")
+      Console.hex(frame[9])
+      Console.write("\n")
       Arch.debug_exit(frame[9] == 0 ? 0x10_u32 : 0x11_u32)
       Arch.stop
     else
