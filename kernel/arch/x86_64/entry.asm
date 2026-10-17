@@ -110,26 +110,17 @@ interrupt_address:
     lea rax, [interrupts]
     mov rax, [rax + rdi * 8]
     ret
-extern exception
+extern interrupt_dispatch
 %assign n 0
 %rep 256
 isr_%+n:
-%if n == 128
-    jmp syscall_entry
-%endif
 %if n != 8 && n != 10 && n != 11 && n != 12 && n != 13 && n != 14 && n != 17 && n != 21 && n != 29 && n != 30
     push 0
 %endif
     push n
-    jmp fault_entry
+    jmp interrupt_entry
 %assign n n+1
 %endrep
-fault_entry:
-    cld
-    mov rdi, rsp
-    and rsp, -16
-    call exception
-    jmp stop
 section .rodata
 align 8
 interrupts:
@@ -146,7 +137,7 @@ enter_user:
     mov es, ax
     push 0x1b
     push rsi
-    push 2
+    push 0x202
     push 0x23
     push rdi
     xor eax, eax
@@ -166,8 +157,7 @@ enter_user:
     xor r15d, r15d
     iretq
 section .text
-extern syscall_dispatch
-syscall_entry:
+interrupt_entry:
     cld
     push rax
     push rbx
@@ -185,10 +175,9 @@ syscall_entry:
     push r14
     push r15
     mov rdi, rsp
-    mov rbx, rsp
     and rsp, -16
-    call syscall_dispatch
-    mov rsp, rbx
+    call interrupt_dispatch
+    mov rsp, rax
     pop r15
     pop r14
     pop r13
@@ -204,6 +193,7 @@ syscall_entry:
     pop rcx
     pop rbx
     pop rax
+    add rsp, 16
     iretq
 
 section .rodata

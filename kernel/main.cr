@@ -12,6 +12,7 @@ require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
 require "./arch/x86_64/cpu"
+require "./arch/x86_64/interrupts"
 
 def store64(p : UInt8*, offset : Int32, value : UInt64)
   i = 0
@@ -84,5 +85,7 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   entry = ELF.load(Pointer(UInt8).new(file[1]), file[2])
   panic("ELF mapping self test") if Memory.lookup(entry) & Memory::NX != 0
   Console.write("[Kristal] Entering Ring 3\n")
+  Timer.init
+  Console.write("[Kristal] PIT timer: 100 Hz\n")
   Arch.enter_user(entry, ELF::STACK)
 end

@@ -40,13 +40,13 @@ end
 
 fun exception(frame : UInt64*) : NoReturn
   Console.write("[Kristal] Exception vector=")
-  Console.hex(frame[0])
+  Console.hex(frame[Frame::VECTOR])
   Console.write(" error=")
-  Console.hex(frame[1])
+  Console.hex(frame[Frame::ERROR])
   Console.write(" rip=")
-  Console.hex(frame[2])
+  Console.hex(frame[Frame::RIP])
   Console.write(" cs=")
-  Console.hex(frame[3])
+  Console.hex(frame[Frame::CS])
   Console.write(" cr2=")
   Console.hex(Arch.read_cr2)
   Console.write("\n")
