@@ -8,6 +8,7 @@ lib Arch
 end
 
 require "./console/framebuffer"
+require "./process"
 require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
@@ -77,15 +78,15 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   end
   Memory.init(hhdm[1], memmap)
   CPU.init
-  Memory.address_space
+  Memory.init_space
   Console.write("[Kristal] Kernel initialized\n")
   panic("missing userspace module") if modules.address == 0 || modules[1] != 1
   file = Pointer(UInt64).new(Pointer(UInt64).new(modules[2])[0])
   Console.write("[Kristal] Loading userspace ELF\n")
-  entry = ELF.load(Pointer(UInt8).new(file[1]), file[2])
-  panic("ELF mapping self test") if Memory.lookup(entry) & Memory::NX != 0
-  Console.write("[Kristal] Entering Ring 3\n")
+  Processes.init
+  Processes.create(file)
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
-  Arch.enter_user(entry, ELF::STACK)
+  Console.write("[Kristal] Entering Ring 3\n")
+  Processes.start
 end

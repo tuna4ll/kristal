@@ -13,7 +13,7 @@ module ELF
     value
   end
 
-  def self.load(data : UInt8*, size : UInt64) : UInt64
+  def self.load(root : UInt64, data : UInt8*, size : UInt64) : UInt64
     panic("ELF header") if size < 64
     panic("ELF magic") if number(data, 0_u64, 4) != 0x464c457f
     panic("ELF format") if data[4] != 2 || data[5] != 1 || data[6] != 1
@@ -72,7 +72,7 @@ module ELF
             end
             permission = flags & 2 != 0 ? 2_u64 : 0_u64
             permission = permission | Memory::NX if flags & 1 == 0
-            Memory.map(address &+ pos, physical, permission)
+            Memory.map(root, address &+ pos, physical, permission)
             pos = pos &+ 4096
           end
         end
@@ -82,7 +82,7 @@ module ELF
     panic("ELF entry") unless executable
     pos = STACK &- 16384
     while pos < STACK
-      Memory.map(pos, Memory.page, Memory::NX | 2_u64)
+      Memory.map(root, pos, Memory.page, Memory::NX | 2_u64)
       pos = pos &+ 4096
     end
     entry

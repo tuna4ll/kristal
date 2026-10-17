@@ -61,11 +61,11 @@ end
 fun interrupt_dispatch(frame : UInt64*) : UInt64*
   vector = frame[Frame::VECTOR]
   if vector == 128
-    Syscalls.dispatch(frame)
+    return Syscalls.dispatch(frame)
   elsif vector >= 32 && vector < 48
     Timer.interrupt(vector)
   else
-    exception(frame)
+    return exception(frame)
   end
   frame
 end

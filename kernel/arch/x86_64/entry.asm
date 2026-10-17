@@ -130,33 +130,27 @@ interrupts:
 %assign n n+1
 %endrep
 section .text
-global enter_user
-enter_user:
+global resume, idle, wait_interrupt, invalidate
+resume:
     mov ax, 0x1b
     mov ds, ax
     mov es, ax
-    push 0x1b
-    push rsi
-    push 0x202
-    push 0x23
-    push rdi
-    xor eax, eax
-    xor ebx, ebx
-    xor ecx, ecx
-    xor edx, edx
-    xor esi, esi
-    xor edi, edi
+    mov rsp, rdi
+    jmp interrupt_return
+extern idle_main
+idle:
+    lea rsp, [stack_top]
     xor ebp, ebp
-    xor r8d, r8d
-    xor r9d, r9d
-    xor r10d, r10d
-    xor r11d, r11d
-    xor r12d, r12d
-    xor r13d, r13d
-    xor r14d, r14d
-    xor r15d, r15d
-    iretq
-section .text
+    call idle_main
+    jmp stop
+wait_interrupt:
+    sti
+    hlt
+    cli
+    ret
+invalidate:
+    invlpg [rdi]
+    ret
 interrupt_entry:
     cld
     push rax
@@ -178,6 +172,7 @@ interrupt_entry:
     and rsp, -16
     call interrupt_dispatch
     mov rsp, rax
+interrupt_return:
     pop r15
     pop r14
     pop r13

@@ -1,5 +1,8 @@
 lib Arch
-  fun enter_user(entry : UInt64, stack : UInt64) : NoReturn
+  fun resume(frame : UInt64*) : NoReturn
+  fun idle : NoReturn
+  fun wait_interrupt
+  fun invalidate(address : UInt64)
   fun read_cr3 : UInt64
   fun write_cr3(root : UInt64)
   fun cpu_load(gdt : UInt64*, idt : UInt64*)
@@ -10,6 +13,12 @@ lib Arch
 end
 
 module CPU
+  @@tss = Pointer(UInt8).new(0_u64)
+
+  def self.set_stack(top : UInt64)
+    store64(@@tss, 4, top)
+  end
+
   def self.init
     gdt = Memory.alloc
     tss = Memory.alloc
@@ -22,6 +31,7 @@ module CPU
     gdt[5] = 103_u64 | ((base & 0xffffff) << 16) | (0x89_u64 << 40) | (((base >> 24) & 255) << 56)
     gdt[6] = base >> 32
     bytes = tss.as(UInt8*)
+    @@tss = bytes
     store64(bytes, 4, Arch.stack_address)
     store64(bytes, 36, Arch.fault_stack_address)
     bytes[102] = 104_u8
@@ -38,7 +48,7 @@ module CPU
   end
 end
 
-fun exception(frame : UInt64*) : NoReturn
+def exception(frame : UInt64*) : UInt64*
   Console.write("[Kristal] Exception vector=")
   Console.hex(frame[Frame::VECTOR])
   Console.write(" error=")
@@ -50,6 +60,10 @@ fun exception(frame : UInt64*) : NoReturn
   Console.write(" cr2=")
   Console.hex(Arch.read_cr2)
   Console.write("\n")
+  vector = frame[Frame::VECTOR]
+  if frame[Frame::CS] == 0x23 && vector != 2 && vector != 8 && vector != 18
+    return Processes.exit(128_u64 &+ vector)
+  end
   Arch.debug_exit(0x11_u32)
   Arch.stop
 end
