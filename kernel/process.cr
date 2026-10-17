@@ -17,6 +17,7 @@ module Processes
   @@table = Pointer(Kernel::Process).new(0_u64)
   @@current = Pointer(Kernel::Process).new(0_u64)
   @@count = 0_u64
+  @@slice = 0_u64
 
   def self.init
     @@table = Memory.alloc.as(Kernel::Process*)
@@ -57,12 +58,40 @@ module Processes
     @@current.value.root
   end
 
+  def self.activate(task : Kernel::Process*) : UInt64*
+    @@current = task
+    task.value.state = RUNNING
+    @@slice = 0_u64
+    CPU.set_stack(task.value.stack)
+    Arch.write_cr3(task.value.root)
+    task.value.frame
+  end
+
+  def self.next_ready : Kernel::Process*
+    index = @@current.value.pid
+    scanned = 0_u64
+    while scanned < @@count
+      index = 0_u64 if index == @@count
+      task = @@table + index.to_i64!
+      return task if task.value.state == READY
+      index = index &+ 1
+      scanned = scanned &+ 1
+    end
+    Pointer(Kernel::Process).new(0_u64)
+  end
+
   def self.start : NoReturn
-    @@current = @@table
-    @@current.value.state = RUNNING
-    CPU.set_stack(@@current.value.stack)
-    Arch.write_cr3(root)
-    Arch.resume(@@current.value.frame)
+    Arch.resume(activate(@@table))
+  end
+
+  def self.tick(frame : UInt64*) : UInt64*
+    return frame if frame[Frame::CS] != 0x23
+    @@current.value.frame = frame
+    @@slice = @@slice &+ 1
+    return frame if @@slice < 5
+    @@current.value.quanta = @@current.value.quanta &+ 1
+    @@current.value.state = READY
+    activate(next_ready)
   end
 
   def self.reap
@@ -98,8 +127,12 @@ module Processes
     Console.hex(status)
     Console.write(" ticks=")
     Console.hex(Timer.ticks)
+    Console.write(" quanta=")
+    Console.hex(@@current.value.quanta)
     Console.write("\n")
     @@current.value.state = ZOMBIE
+    task = next_ready
+    return activate(task) if task.address != 0
     @@current = Pointer(Kernel::Process).new(0_u64)
     Arch.write_cr3(Memory.kernel_root)
     # Reclaim the old kernel stack only after moving to the boot stack.

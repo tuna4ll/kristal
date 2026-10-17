@@ -80,13 +80,18 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   CPU.init
   Memory.init_space
   Console.write("[Kristal] Kernel initialized\n")
-  panic("missing userspace module") if modules.address == 0 || modules[1] != 1
-  file = Pointer(UInt64).new(Pointer(UInt64).new(modules[2])[0])
-  Console.write("[Kristal] Loading userspace ELF\n")
+  panic("expected two userspace modules") if modules.address == 0 || modules[1] != 2
+  files = Pointer(UInt64).new(modules[2])
   Processes.init
-  Processes.create(file)
+  i = 0_u64
+  while i < modules[1]
+    Console.write("[Kristal] Loading userspace ELF\n")
+    Processes.create(Pointer(UInt64).new(files[i]))
+    i = i &+ 1
+  end
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
+  Console.write("[Kristal] Round-robin: 50 ms quantum\n")
   Console.write("[Kristal] Entering Ring 3\n")
   Processes.start
 end

@@ -1,20 +1,16 @@
-require "../../runtime/base"
-
-lib Syscall
-  fun invoke(number : UInt64, arg1 : UInt64, arg2 : UInt64) : Int64
-end
+require "../syscall"
 
 fun user_main : NoReturn
-  message = "Hello World from Userspace\n"
-  result = Syscall.invoke(1_u64, message.to_unsafe.address, 27_u64)
-  work = 0_u64
-  while work < 2000000
-    asm("pause" ::: "memory" : "volatile")
-    work = work &+ 1
+  User.write("Hello World from Userspace\n")
+  round = 0_u64
+  while round < 4
+    work = 0_u64
+    while work < 2000000
+      asm("pause" ::: "memory" : "volatile")
+      work = work &+ 1
+    end
+    User.write("init: working\n")
+    round = round &+ 1
   end
-  status = result == 27 ? 0_u64 : 1_u64
-  Syscall.invoke(2_u64, status, 0_u64)
-  while true
-    asm("ud2" ::: "memory" : "volatile")
-  end
+  User.exit(0_u64)
 end

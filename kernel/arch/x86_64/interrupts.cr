@@ -59,11 +59,13 @@ module Timer
 end
 
 fun interrupt_dispatch(frame : UInt64*) : UInt64*
+  Processes.reap
   vector = frame[Frame::VECTOR]
   if vector == 128
     return Syscalls.dispatch(frame)
   elsif vector >= 32 && vector < 48
     Timer.interrupt(vector)
+    return Processes.tick(frame) if vector == 32
   else
     return exception(frame)
   end

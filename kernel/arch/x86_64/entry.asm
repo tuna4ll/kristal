@@ -103,7 +103,8 @@ cpu_load:
     or eax, 1 << 11
     wrmsr
     mov rax, cr0
-    or rax, 1 << 16
+    ; FPU/SIMD context switching is not implemented; trap these instructions.
+    or rax, (1 << 16) | (1 << 3) | (1 << 2)
     mov cr0, rax
     ret
 interrupt_address:

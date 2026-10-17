@@ -24,7 +24,7 @@ build/kernel.elf: build/kernel.o build/entry.o linker/kernel.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/kernel.ld build/entry.o build/kernel.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/user.o: userspace/init/main.cr runtime/base.cr scripts/compile.sh | build
+build/user.o: userspace/init/main.cr userspace/syscall.cr runtime/base.cr scripts/compile.sh | build
 	scripts/compile.sh userspace/init/main.cr build/user small
 
 build/user-entry.o: userspace/init/entry.asm | build
@@ -34,8 +34,15 @@ build/init.elf: build/user.o build/user-entry.o linker/user.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/user.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/kristal.iso: build/init.elf build/kernel.elf limine.conf vendor/limine/limine scripts/image.sh
-	scripts/image.sh build/kernel.elf build/init.elf $@ >build/iso.log 2>&1
+build/worker.o: userspace/worker/main.cr userspace/syscall.cr runtime/base.cr scripts/compile.sh | build
+	scripts/compile.sh userspace/worker/main.cr build/worker small
+
+build/worker.elf: build/worker.o build/user-entry.o linker/user.ld
+	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/worker.o -o $@
+	test -z "$$(nm -u $@)"
+
+build/kristal.iso: build/worker.elf build/init.elf build/kernel.elf limine.conf vendor/limine/limine scripts/image.sh
+	scripts/image.sh build/kernel.elf build/init.elf build/worker.elf $@ >build/iso.log 2>&1
 
 run: all
 	$(QEMU) -cdrom build/kristal.iso

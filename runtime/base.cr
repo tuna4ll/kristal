@@ -9,6 +9,10 @@ struct Pointer(T)
 end
 
 class String
+  def bytesize : Int32
+    @bytesize
+  end
+
   def to_unsafe : UInt8*
     pointerof(@c)
   end
