@@ -10,6 +10,10 @@ module User
     exit(1_u64) if Syscall.invoke(1_u64, text.to_unsafe.address, length) != length
   end
 
+  def self.sleep(ticks : UInt64)
+    exit(1_u64) if Syscall.invoke(6_u64, ticks, 0_u64) != 0
+  end
+
   def self.exit(status : UInt64) : NoReturn
     Syscall.invoke(2_u64, status, 0_u64)
     while true

@@ -65,7 +65,10 @@ fun interrupt_dispatch(frame : UInt64*) : UInt64*
     return Syscalls.dispatch(frame)
   elsif vector >= 32 && vector < 48
     Timer.interrupt(vector)
-    return Processes.tick(frame) if vector == 32
+    if vector == 32
+      Processes.wake_sleepers
+      return Processes.tick(frame)
+    end
   else
     return exception(frame)
   end

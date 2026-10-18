@@ -40,6 +40,8 @@ module Syscalls
       frame[Frame::RAX] = length
     elsif frame[Frame::RAX] == 2
       return Processes.exit(frame[9])
+    elsif frame[Frame::RAX] == 6
+      return Processes.sleep(frame, frame[9])
     else
       frame[Frame::RAX] = 0_u64 &- 38
     end

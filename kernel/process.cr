@@ -6,6 +6,7 @@ lib Kernel
     pid : UInt64
     state : UInt64
     quanta : UInt64
+    wake_tick : UInt64
   end
 end
 
@@ -13,11 +14,13 @@ module Processes
   READY      =                  1_u64
   RUNNING    =                  2_u64
   ZOMBIE     =                  3_u64
+  SLEEPING   =                  4_u64
   STACK_BASE = 0xfffffe0000000000_u64
   @@table = Pointer(Kernel::Process).new(0_u64)
   @@current = Pointer(Kernel::Process).new(0_u64)
   @@count = 0_u64
   @@slice = 0_u64
+  @@cursor = 0_u64
 
   def self.init
     @@table = Memory.alloc.as(Kernel::Process*)
@@ -60,6 +63,7 @@ module Processes
 
   def self.activate(task : Kernel::Process*) : UInt64*
     @@current = task
+    @@cursor = task.value.pid
     task.value.state = RUNNING
     @@slice = 0_u64
     CPU.set_stack(task.value.stack)
@@ -68,7 +72,7 @@ module Processes
   end
 
   def self.next_ready : Kernel::Process*
-    index = @@current.value.pid
+    index = @@cursor
     scanned = 0_u64
     while scanned < @@count
       index = 0_u64 if index == @@count
@@ -78,6 +82,50 @@ module Processes
       scanned = scanned &+ 1
     end
     Pointer(Kernel::Process).new(0_u64)
+  end
+
+  def self.current : Kernel::Process*
+    @@current
+  end
+
+  def self.task(pid : UInt64) : Kernel::Process*
+    panic("invalid process id") if pid == 0 || pid > @@count
+    @@table + (pid &- 1).to_i64!
+  end
+
+  def self.schedule : UInt64*
+    chosen = next_ready
+    return activate(chosen) if chosen.address != 0
+    @@current = Pointer(Kernel::Process).new(0_u64)
+    Arch.write_cr3(Memory.kernel_root)
+    Arch.idle
+  end
+
+  def self.block(frame : UInt64*, state : UInt64) : UInt64*
+    @@current.value.frame = frame
+    @@current.value.state = state
+    schedule
+  end
+
+  def self.sleep(frame : UInt64*, ticks : UInt64) : UInt64*
+    if ticks > 6000
+      frame[Frame::RAX] = 0_u64 &- 22
+      return frame
+    end
+    frame[Frame::RAX] = 0_u64
+    @@current.value.wake_tick = Timer.ticks &+ ticks
+    block(frame, ticks == 0 ? READY : SLEEPING)
+  end
+
+  def self.wake_sleepers
+    i = 0_u64
+    while i < @@count
+      process = @@table + i.to_i64!
+      if process.value.state == SLEEPING && (Timer.ticks &- process.value.wake_tick).to_i64! >= 0
+        process.value.state = READY
+      end
+      i = i &+ 1
+    end
   end
 
   def self.start : NoReturn
@@ -131,20 +179,16 @@ module Processes
     Console.hex(@@current.value.quanta)
     Console.write("\n")
     @@current.value.state = ZOMBIE
-    task = next_ready
-    return activate(task) if task.address != 0
-    @@current = Pointer(Kernel::Process).new(0_u64)
-    Arch.write_cr3(Memory.kernel_root)
-    # Reclaim the old kernel stack only after moving to the boot stack.
-    Arch.idle
+    schedule
   end
 end
 
 fun idle_main : NoReturn
   Processes.reap
   CPU.set_stack(Arch.stack_address)
-  Console.write("[Kristal] No runnable processes; idle\n")
   while true
+    chosen = Processes.next_ready
+    Arch.resume(Processes.activate(chosen)) if chosen.address != 0
     Arch.wait_interrupt
   end
 end
