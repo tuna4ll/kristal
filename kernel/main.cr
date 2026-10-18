@@ -9,6 +9,7 @@ end
 
 require "./console/framebuffer"
 require "./process"
+require "./ipc"
 require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
@@ -83,12 +84,16 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   panic("expected two userspace modules") if modules.address == 0 || modules[1] != 2
   files = Pointer(UInt64).new(modules[2])
   Processes.init
+  IPC.init
   i = 0_u64
   while i < modules[1]
     Console.write("[Kristal] Loading userspace ELF\n")
     Processes.create(Pointer(UInt64).new(files[i]))
     i = i &+ 1
   end
+  endpoint = IPC.create(2_u64)
+  IPC.grant(1_u64, 1_u64, endpoint, IPC::CALL)
+  IPC.grant(2_u64, 1_u64, endpoint, IPC::RECEIVE | IPC::REPLY)
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
   Console.write("[Kristal] Round-robin: 50 ms quantum\n")

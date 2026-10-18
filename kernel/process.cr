@@ -7,6 +7,9 @@ lib Kernel
     state : UInt64
     quanta : UInt64
     wake_tick : UInt64
+    ipc_endpoint : UInt64
+    ipc_buffer : UInt64
+    ipc_next : UInt64
   end
 end
 
@@ -15,6 +18,9 @@ module Processes
   RUNNING    =                  2_u64
   ZOMBIE     =                  3_u64
   SLEEPING   =                  4_u64
+  CALLING    =                  5_u64
+  RECEIVING  =                  6_u64
+  MAX        =                  8_u64
   STACK_BASE = 0xfffffe0000000000_u64
   @@table = Pointer(Kernel::Process).new(0_u64)
   @@current = Pointer(Kernel::Process).new(0_u64)
@@ -27,7 +33,7 @@ module Processes
   end
 
   def self.create(file : UInt64*)
-    panic("process limit") if @@count == 2
+    panic("process limit") if @@count == MAX
     task = @@table + @@count.to_i64!
     bottom = STACK_BASE &+ (@@count << 16) &+ Memory::PAGE
     offset = 0_u64
@@ -178,6 +184,7 @@ module Processes
     Console.write(" quanta=")
     Console.hex(@@current.value.quanta)
     Console.write("\n")
+    IPC.detach(@@current.value.pid)
     @@current.value.state = ZOMBIE
     schedule
   end

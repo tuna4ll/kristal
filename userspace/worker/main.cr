@@ -1,12 +1,16 @@
 require "../syscall"
 
 fun user_main : NoReturn
-  User.write("worker: started\n")
-  round = 0_u64
-  while round < 8
-    User.sleep(20_u64)
-    User.write("worker: working\n")
-    round = round &+ 1
+  message = uninitialized ABI::Message
+  while true
+    sender = User.receive(1_u64, pointerof(message))
+    User.exit(1_u64) if sender < 0
+    if message.kind == 2
+      User.reply(1_u64, pointerof(message))
+      User.exit(0_u64)
+    end
+    message.a = message.a &+ 1
+    User.write("worker: replying to request\n")
+    User.exit(1_u64) if User.reply(1_u64, pointerof(message)) != 0
   end
-  User.exit(0_u64)
 end

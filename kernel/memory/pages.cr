@@ -125,6 +125,42 @@ module Memory
     0_u64
   end
 
+  def self.access(root : UInt64, address : UInt64, length : UInt64, write : Bool) : Bool
+    return false if address < 0x10000 || address >= 0x80000000 || length > 0x80000000_u64 &- address
+    return true if length == 0
+    page = address & ~4095_u64
+    last = (address &+ length &- 1) & ~4095_u64
+    while page <= last
+      entry = lookup(root, page)
+      return false if entry == 0 || (write && entry & 2 == 0)
+      page = page &+ PAGE
+    end
+    true
+  end
+
+  def self.copy_user(root : UInt64, address : UInt64, buffer : UInt8*, length : UInt64, to_user : Bool) : Bool
+    return false unless access(root, address, length, to_user)
+    done = 0_u64
+    while done < length
+      current = address &+ done
+      offset = current & 4095
+      count = PAGE &- offset
+      count = length &- done if count > length &- done
+      user = Pointer(UInt8).new((lookup(root, current) & MASK) &+ @@offset &+ offset)
+      i = 0_u64
+      while i < count
+        if to_user
+          user[i] = buffer[done &+ i]
+        else
+          buffer[done &+ i] = user[i]
+        end
+        i = i &+ 1
+      end
+      done = done &+ count
+    end
+    true
+  end
+
   def self.unmap_stack(address : UInt64)
     table = ptr(@@kernel_root)
     shift = 39

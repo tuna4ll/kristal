@@ -40,6 +40,12 @@ module Syscalls
       frame[Frame::RAX] = length
     elsif frame[Frame::RAX] == 2
       return Processes.exit(frame[9])
+    elsif frame[Frame::RAX] == 3
+      return IPC.call(frame, frame[9], frame[8])
+    elsif frame[Frame::RAX] == 4
+      return IPC.receive(frame, frame[9], frame[8])
+    elsif frame[Frame::RAX] == 5
+      return IPC.reply(frame, frame[9], frame[8])
     elsif frame[Frame::RAX] == 6
       return Processes.sleep(frame, frame[9])
     else

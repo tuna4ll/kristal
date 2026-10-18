@@ -24,7 +24,7 @@ build/kernel.elf: build/kernel.o build/entry.o linker/kernel.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/kernel.ld build/entry.o build/kernel.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/user.o: userspace/init/main.cr userspace/syscall.cr runtime/base.cr scripts/compile.sh | build
+build/user.o: userspace/init/main.cr userspace/syscall.cr runtime/base.cr runtime/abi.cr scripts/compile.sh | build
 	scripts/compile.sh userspace/init/main.cr build/user small
 
 build/user-entry.o: userspace/init/entry.asm | build
@@ -34,7 +34,7 @@ build/init.elf: build/user.o build/user-entry.o linker/user.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/user.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/worker.o: userspace/worker/main.cr userspace/syscall.cr runtime/base.cr scripts/compile.sh | build
+build/worker.o: userspace/worker/main.cr userspace/syscall.cr runtime/base.cr runtime/abi.cr scripts/compile.sh | build
 	scripts/compile.sh userspace/worker/main.cr build/worker small
 
 build/worker.elf: build/worker.o build/user-entry.o linker/user.ld
