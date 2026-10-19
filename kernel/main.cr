@@ -1,12 +1,5 @@
 require "../runtime/base"
 
-lib Arch
-  fun port_out(port : UInt16, value : UInt8)
-  fun port_in(port : UInt16) : UInt8
-  fun debug_exit(value : UInt32)
-  fun stop : NoReturn
-end
-
 require "../runtime/abi"
 require "../runtime/screen"
 require "./console/display"
@@ -15,6 +8,7 @@ require "./ipc"
 require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
+require "./arch/x86_64/entry"
 require "./arch/x86_64/cpu"
 require "./arch/x86_64/interrupts"
 

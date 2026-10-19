@@ -1,16 +1,117 @@
-lib Arch
-  fun resume(frame : UInt64*) : NoReturn
-  fun idle : NoReturn
-  fun wait_interrupt
-  fun invalidate(address : UInt64)
-  fun read_cr3 : UInt64
-  fun write_cr3(root : UInt64)
-  fun cpu_load(gdt : UInt64*, idt : UInt64*)
-  fun stack_address : UInt64
-  fun fault_stack_address : UInt64
-  fun interrupt_address(index : UInt64) : UInt64
-  fun read_cr2 : UInt64
-  fun tss_address : UInt8*
+module Arch
+  def self.port_out(port : UInt16, value : UInt8)
+    asm("outb %al, %dx" :: "{dx}"(port), "{al}"(value) :: "volatile")
+  end
+
+  def self.port_in(port : UInt16) : UInt8
+    value = 0_u8
+    asm("inb %dx, %al" : "={al}"(value) : "{dx}"(port) :: "volatile")
+    value
+  end
+
+  def self.debug_exit(value : UInt32)
+    asm("outl %eax, %dx" :: "{dx}"(0xf4_u16), "{eax}"(value) :: "volatile")
+  end
+
+  def self.stop : NoReturn
+    while true
+      asm("cli; hlt" :::: "volatile")
+    end
+  end
+
+  def self.resume(frame : UInt64*) : NoReturn
+    asm("mov $0, %rsp; mov $$0x1b, %ax; mov %ax, %ds; mov %ax, %es; jmp interrupt_return" :: "r"(frame) : "rax" : "volatile")
+    stop
+  end
+
+  def self.idle : NoReturn
+    asm("lea stack_top(%rip), %rsp; xor %ebp, %ebp; call idle_main" :::: "volatile")
+    stop
+  end
+
+  def self.wait_interrupt
+    asm("sti; hlt; cli" ::: "memory" : "volatile")
+  end
+
+  def self.invalidate(address : UInt64)
+    asm("invlpg ($0)" :: "r"(address) : "memory" : "volatile")
+  end
+
+  def self.read_cr3 : UInt64
+    value = 0_u64
+    asm("mov %cr3, $0" : "=r"(value) ::: "volatile")
+    value
+  end
+
+  def self.write_cr3(root : UInt64)
+    asm("mov $0, %cr3" :: "r"(root) : "memory" : "volatile")
+  end
+
+  def self.read_cr2 : UInt64
+    value = 0_u64
+    asm("mov %cr2, $0" : "=r"(value) ::: "volatile")
+    value
+  end
+
+  def self.stack_address : UInt64
+    value = 0_u64
+    asm("lea stack_top(%rip), $0" : "=r"(value))
+    value
+  end
+
+  def self.fault_stack_address : UInt64
+    value = 0_u64
+    asm("lea fault_stack_top(%rip), $0" : "=r"(value))
+    value
+  end
+
+  def self.tss_address : UInt8*
+    value = 0_u64
+    asm("lea tss(%rip), $0" : "=r"(value))
+    Pointer(UInt8).new(value)
+  end
+
+  # every stub in entry.cr is padded to 16 bytes
+  def self.interrupt_address(index : UInt64) : UInt64
+    value = 0_u64
+    asm("lea interrupt_stubs(%rip), $0" : "=r"(value))
+    value &+ (index << 4)
+  end
+
+  # fpu and simd state is not switched yet, so those instructions trap
+  def self.cpu_load(gdt : UInt64*, idt : UInt64*)
+    asm("
+      sub $$16, %rsp
+      movw $$55, (%rsp)
+      mov $0, 2(%rsp)
+      lgdt (%rsp)
+      movw $$4095, (%rsp)
+      mov $1, 2(%rsp)
+      lidt (%rsp)
+      add $$16, %rsp
+      pushq $$8
+      lea 1f(%rip), %rax
+      push %rax
+      lretq
+    1:
+      mov $$16, %ax
+      mov %ax, %ds
+      mov %ax, %es
+      mov %ax, %ss
+      xor %eax, %eax
+      mov %ax, %fs
+      mov %ax, %gs
+      mov $$40, %ax
+      ltr %ax
+      mov $$0xc0000080, %ecx
+      rdmsr
+      or $$(1 << 11), %eax
+      wrmsr
+      mov %cr0, %rax
+      or $$((1 << 16) | (1 << 3) | (1 << 2)), %rax
+      mov %rax, %cr0
+    " :: "r"(gdt), "r"(idt) : "rax", "rcx", "rdx", "memory" : "volatile")
+  end
 end
 
 module CPU

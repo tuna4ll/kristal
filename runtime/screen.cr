@@ -1,5 +1,13 @@
-lib Arch
-  fun font_address : UInt8*
+fun screen_font_data
+  asm(".pushsection .rodata; screen_font: .incbin \"kernel/console/font.bin\"; .popsection" :::: "volatile")
+end
+
+module Arch
+  def self.font_address : UInt8*
+    value = 0_u64
+    asm("lea screen_font(%rip), $0" : "=r"(value))
+    Pointer(UInt8).new(value)
+  end
 end
 
 module Screen

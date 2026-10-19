@@ -1,8 +1,24 @@
 require "../runtime/base"
 require "../runtime/abi"
 
-lib Syscall
-  fun invoke(number : UInt64, arg1 : UInt64, arg2 : UInt64) : Int64
+fun user_entry_code
+  asm("
+    .pushsection .text
+    .globl _user_start
+    _user_start:
+      xor %ebp, %ebp
+      call user_main
+      ud2
+    .popsection
+  " :::: "volatile")
+end
+
+module Syscall
+  def self.invoke(number : UInt64, arg1 : UInt64, arg2 : UInt64) : Int64
+    result = 0_i64
+    asm("int $$0x80" : "={rax}"(result) : "{rax}"(number), "{rdi}"(arg1), "{rsi}"(arg2) : "memory" : "volatile")
+    result
+  end
 end
 
 module User

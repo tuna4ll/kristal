@@ -1,9 +1,16 @@
 require "../syscall"
 require "../../runtime/screen"
 
-lib Arch
-  fun port_in(port : UInt16) : UInt8
-  fun port_out(port : UInt16, value : UInt8)
+module Arch
+  def self.port_in(port : UInt16) : UInt8
+    value = 0_u8
+    asm("inb %dx, %al" : "={al}"(value) : "{dx}"(port) :: "volatile")
+    value
+  end
+
+  def self.port_out(port : UInt16, value : UInt8)
+    asm("outb %al, %dx" :: "{dx}"(port), "{al}"(value) :: "volatile")
+  end
 end
 
 def put(value : UInt8)
