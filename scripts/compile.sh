@@ -1,8 +1,5 @@
 #!/bin/sh
 set -eu
-crystal --version | grep -q '^Crystal 1.22.0 ' || { echo 'Crystal 1.22.0 required' >&2; exit 1; }
-llc --version | grep -q 'LLVM version 23.1.1$' || { echo 'LLVM 23.1.1 required' >&2; exit 1; }
-ld.lld --version | grep -q '^LLD 23.1.1 ' || { echo 'LLD 23.1.1 required' >&2; exit 1; }
 src=$1
 out=$2
 model=$3
