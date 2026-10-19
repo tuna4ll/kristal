@@ -10,4 +10,15 @@ lib ABI
     e : UInt64
     f : UInt64
   end
+
+  struct Display
+    address : UInt64
+    width : UInt64
+    height : UInt64
+    pitch : UInt64
+    red : UInt64
+    green : UInt64
+    blue : UInt64
+    length : UInt64
+  end
 end

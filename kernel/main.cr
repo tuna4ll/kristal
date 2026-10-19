@@ -7,7 +7,9 @@ lib Arch
   fun stop : NoReturn
 end
 
-require "./console/framebuffer"
+require "../runtime/abi"
+require "../runtime/screen"
+require "./console/display"
 require "./process"
 require "./ipc"
 require "./syscall/dispatch"
@@ -25,6 +27,7 @@ def store64(p : UInt8*, offset : Int32, value : UInt64)
 end
 
 def panic(message : String) : NoReturn
+  Console.emergency
   Console.write("[Kristal] Panic: ")
   Console.write(message)
   Console.write("\n")
@@ -33,6 +36,16 @@ def panic(message : String) : NoReturn
 end
 
 module Console
+  @@screen = false
+
+  def self.handoff
+    @@screen = false
+  end
+
+  def self.emergency
+    @@screen = true
+  end
+
   def self.hex(value : UInt64)
     digits = "0123456789abcdef".to_unsafe
     shift = 60
@@ -43,6 +56,7 @@ module Console
   end
 
   def self.init
+    @@screen = true
     Arch.port_out(0x3f9_u16, 0_u8)
     Arch.port_out(0x3fb_u16, 0x80_u8)
     Arch.port_out(0x3f8_u16, 1_u8)
@@ -56,7 +70,7 @@ module Console
     while Arch.port_in(0x3fd_u16) & 0x20 == 0
     end
     Arch.port_out(0x3f8_u16, value)
-    Framebuffer.byte(value)
+    Screen.byte(value) if @@screen
   end
 
   def self.write(text : String)
@@ -71,7 +85,7 @@ end
 
 fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer : UInt64*) : NoReturn
   Console.init
-  Framebuffer.init(framebuffer)
+  Display.init(framebuffer)
   Console.write("[Kristal] Booting...\n")
   if hhdm.address == 0 || memmap.address == 0
     Console.write("[Kristal] Missing Limine response\n")
@@ -81,22 +95,27 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   CPU.init
   Memory.init_space
   Console.write("[Kristal] Kernel initialized\n")
-  panic("expected two userspace modules") if modules.address == 0 || modules[1] != 2
+  panic("expected init, console and worker modules") if modules.address == 0 || modules[1] != 3
   files = Pointer(UInt64).new(modules[2])
   Processes.init
   IPC.init
   i = 0_u64
   while i < modules[1]
     Console.write("[Kristal] Loading userspace ELF\n")
-    Processes.create(Pointer(UInt64).new(files[i]))
+    Processes.create(Pointer(UInt64).new(files[i]), i == 1 ? 1_u64 : 0_u64)
     i = i &+ 1
   end
   endpoint = IPC.create(2_u64)
   IPC.grant(1_u64, 1_u64, endpoint, IPC::CALL)
   IPC.grant(2_u64, 1_u64, endpoint, IPC::RECEIVE | IPC::REPLY)
+  IPC.grant(3_u64, 1_u64, endpoint, IPC::CALL)
+  coordination = IPC.create(1_u64)
+  IPC.grant(1_u64, 2_u64, coordination, IPC::RECEIVE | IPC::REPLY)
+  IPC.grant(3_u64, 2_u64, coordination, IPC::CALL)
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
   Console.write("[Kristal] Round-robin: 50 ms quantum\n")
   Console.write("[Kristal] Entering Ring 3\n")
+  Console.handoff
   Processes.start
 end

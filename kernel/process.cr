@@ -10,6 +10,7 @@ lib Kernel
     ipc_endpoint : UInt64
     ipc_buffer : UInt64
     ipc_next : UInt64
+    devices : UInt64
   end
 end
 
@@ -32,7 +33,7 @@ module Processes
     @@table = Memory.alloc.as(Kernel::Process*)
   end
 
-  def self.create(file : UInt64*)
+  def self.create(file : UInt64*, devices : UInt64 = 0_u64)
     panic("process limit") if @@count == MAX
     task = @@table + @@count.to_i64!
     bottom = STACK_BASE &+ (@@count << 16) &+ Memory::PAGE
@@ -43,6 +44,7 @@ module Processes
     end
     root = Memory.create_space
     entry = ELF.load(root, Pointer(UInt8).new(file[1]), file[2])
+    Display.grant(root) if devices & 1 != 0
     top = bottom &+ 16384
     frame = Pointer(UInt64).new(top &- (Frame::WORDS.to_u64! &* 8))
     frame[Frame::RIP] = entry
@@ -50,6 +52,7 @@ module Processes
     frame[Frame::FLAGS] = 0x202_u64
     frame[Frame::RSP] = ELF::STACK
     frame[Frame::SS] = 0x1b_u64
+    task.value.devices = devices
     task.value.root = root
     task.value.stack = top
     task.value.frame = frame
@@ -73,6 +76,7 @@ module Processes
     task.value.state = RUNNING
     @@slice = 0_u64
     CPU.set_stack(task.value.stack)
+    CPU.set_io(task.value.devices & 1 != 0)
     Arch.write_cr3(task.value.root)
     task.value.frame
   end
@@ -193,6 +197,7 @@ end
 fun idle_main : NoReturn
   Processes.reap
   CPU.set_stack(Arch.stack_address)
+  CPU.set_io(false)
   while true
     chosen = Processes.next_ready
     Arch.resume(Processes.activate(chosen)) if chosen.address != 0

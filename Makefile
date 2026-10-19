@@ -41,8 +41,18 @@ build/worker.elf: build/worker.o build/user-entry.o linker/user.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/worker.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/kristal.iso: build/worker.elf build/init.elf build/kernel.elf limine.conf vendor/limine/limine scripts/image.sh
-	scripts/image.sh build/kernel.elf build/init.elf build/worker.elf $@ >build/iso.log 2>&1
+build/console.o: userspace/console/main.cr userspace/syscall.cr runtime/base.cr runtime/abi.cr runtime/screen.cr scripts/compile.sh | build
+	scripts/compile.sh userspace/console/main.cr build/console small
+
+build/console-io.o: userspace/console/io.asm kernel/console/font.bin | build
+	nasm -f elf64 $< -o $@
+
+build/console.elf: build/console.o build/console-io.o build/user-entry.o linker/user.ld
+	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user-entry.o build/console.o build/console-io.o -o $@
+	test -z "$$(nm -u $@)"
+
+build/kristal.iso: build/console.elf build/worker.elf build/init.elf build/kernel.elf limine.conf vendor/limine/limine scripts/image.sh
+	scripts/image.sh build/kernel.elf build/init.elf build/console.elf build/worker.elf $@ >build/iso.log 2>&1
 
 run: all
 	$(QEMU) -cdrom build/kristal.iso

@@ -199,3 +199,12 @@ global font_address
 font_address:
     lea rax, [font]
     ret
+
+section .bss
+align 16
+tss: resb 8297
+section .text
+global tss_address
+tss_address:
+    lea rax, [tss]
+    ret

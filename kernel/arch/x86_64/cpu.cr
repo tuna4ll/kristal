@@ -10,6 +10,7 @@ lib Arch
   fun fault_stack_address : UInt64
   fun interrupt_address(index : UInt64) : UInt64
   fun read_cr2 : UInt64
+  fun tss_address : UInt8*
 end
 
 module CPU
@@ -19,22 +20,31 @@ module CPU
     store64(@@tss, 4, top)
   end
 
+  def self.set_io(serial : Bool)
+    @@tss[104 &+ (0x3f8 >> 3)] = serial ? 0_u8 : 0xff_u8
+  end
+
   def self.init
     gdt = Memory.alloc
-    tss = Memory.alloc
+    tss = Arch.tss_address
     idt = Memory.alloc
     gdt[1] = 0x00af9a000000ffff_u64
     gdt[2] = 0x00cf92000000ffff_u64
     gdt[3] = 0x00cff2000000ffff_u64
     gdt[4] = 0x00affa000000ffff_u64
     base = tss.address
-    gdt[5] = 103_u64 | ((base & 0xffffff) << 16) | (0x89_u64 << 40) | (((base >> 24) & 255) << 56)
+    gdt[5] = 8296_u64 | ((base & 0xffffff) << 16) | (0x89_u64 << 40) | (((base >> 24) & 255) << 56)
     gdt[6] = base >> 32
     bytes = tss.as(UInt8*)
     @@tss = bytes
     store64(bytes, 4, Arch.stack_address)
     store64(bytes, 36, Arch.fault_stack_address)
     bytes[102] = 104_u8
+    i = 104
+    while i <= 8296
+      bytes[i] = 0xff_u8
+      i = i &+ 1
+    end
     i = 0_u64
     while i < 256
       address = Arch.interrupt_address(i)

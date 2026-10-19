@@ -1,6 +1,6 @@
 module ELF
   MIN   =    0x10000_u64
-  MAX   = 0x70000000_u64
+  MAX   = 0x50000000_u64
   STACK = 0x7ffff000_u64
 
   def self.number(data : UInt8*, offset : UInt64, width : Int32) : UInt64

@@ -1,7 +1,8 @@
 module Memory
-  PAGE =               4096_u64
-  MASK = 0x000ffffffffff000_u64
-  NX   = 0x8000000000000000_u64
+  PAGE     =               4096_u64
+  MASK     = 0x000ffffffffff000_u64
+  NX       = 0x8000000000000000_u64
+  BORROWED =              0x200_u64
   @@offset = 0_u64
   @@map = Pointer(UInt64).new(0_u64)
   @@index = 0_u64
@@ -117,7 +118,7 @@ module Memory
     shift = 39
     while shift >= 12
       value = table[(address >> shift) & 511]
-      return 0_u64 if value & 5 != 5 || value & 128 != 0
+      return 0_u64 if value & 5 != 5 || (shift > 12 && value & 128 != 0)
       return value if shift == 12
       table = ptr(value & MASK)
       shift = shift &- 9
@@ -161,6 +162,26 @@ module Memory
     true
   end
 
+  def self.physical(address : UInt64) : UInt64
+    address &- @@offset
+  end
+
+  def self.cache_flags(address : UInt64) : UInt64
+    table = ptr(@@kernel_root)
+    shift = 39
+    while shift >= 12
+      entry = table[(address >> shift) & 511]
+      panic("unmapped device") if entry & 1 == 0
+      return entry & 0x98_u64 if shift == 12
+      if entry & 128 != 0
+        return (entry & 0x18_u64) | ((entry >> 5) & 0x80_u64)
+      end
+      table = ptr(entry & MASK)
+      shift = shift &- 9
+    end
+    0_u64
+  end
+
   def self.unmap_stack(address : UInt64)
     table = ptr(@@kernel_root)
     shift = 39
@@ -181,9 +202,9 @@ module Memory
     while i < 512
       entry = table[i]
       if entry & 1 != 0
-        panic("huge page in process") if entry & 128 != 0
+        panic("huge page in process") if level > 1 && entry & 128 != 0
         if level == 1
-          free(entry & MASK)
+          free(entry & MASK) if entry & BORROWED == 0
         else
           free_table(entry & MASK, level &- 1)
         end

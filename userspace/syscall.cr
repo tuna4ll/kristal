@@ -7,8 +7,24 @@ end
 
 module User
   def self.write(text : String)
+    message = uninitialized ABI::Message
+    clear(pointerof(message))
+    done = 0_u64
     length = text.bytesize.to_u64!
-    exit(1_u64) if Syscall.invoke(1_u64, text.to_unsafe.address, length) != length
+    while done < length
+      count = length &- done
+      count = 48_u64 if count > 48
+      message.kind = 1_u64
+      message.size = count
+      bytes = pointerof(message).as(UInt8*) + 16_i64
+      i = 0_u64
+      while i < count
+        bytes[i] = text.to_unsafe[done &+ i]
+        i = i &+ 1
+      end
+      exit(1_u64) if call(1_u64, pointerof(message)) != 0 || message.kind != 0 || message.size != count
+      done = done &+ count
+    end
   end
 
   def self.clear(message : ABI::Message*)
