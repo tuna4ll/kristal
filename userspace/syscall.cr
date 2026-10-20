@@ -64,6 +64,10 @@ module User
     Syscall.invoke(5_u64, handle, message.address)
   end
 
+  def self.wait(pid : UInt64, status : UInt64*) : Int64
+    Syscall.invoke(8_u64, pid, status.address)
+  end
+
   def self.sleep(ticks : UInt64)
     exit(1_u64) if Syscall.invoke(6_u64, ticks, 0_u64) != 0
   end

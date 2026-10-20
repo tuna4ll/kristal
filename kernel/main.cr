@@ -103,9 +103,6 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   IPC.grant(1_u64, 1_u64, endpoint, IPC::CALL)
   IPC.grant(2_u64, 1_u64, endpoint, IPC::RECEIVE | IPC::REPLY)
   IPC.grant(3_u64, 1_u64, endpoint, IPC::CALL)
-  coordination = IPC.create(1_u64)
-  IPC.grant(1_u64, 2_u64, coordination, IPC::RECEIVE | IPC::REPLY)
-  IPC.grant(3_u64, 2_u64, coordination, IPC::CALL)
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
   Console.write("[Kristal] Round-robin: 50 ms quantum\n")

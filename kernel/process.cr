@@ -11,6 +11,11 @@ lib Kernel
     ipc_buffer : UInt64
     ipc_next : UInt64
     devices : UInt64
+    parent : UInt64
+    exit_status : UInt64
+    collected : UInt64
+    wait_pid : UInt64
+    wait_buffer : UInt64
   end
 end
 
@@ -21,6 +26,8 @@ module Processes
   SLEEPING   =                  4_u64
   CALLING    =                  5_u64
   RECEIVING  =                  6_u64
+  DEAD       =                  7_u64
+  WAITING    =                  8_u64
   MAX        =                  8_u64
   STACK_BASE = 0xfffffe0000000000_u64
   @@table = Pointer(Kernel::Process).new(0_u64)
@@ -57,6 +64,7 @@ module Processes
     task.value.stack = top
     task.value.frame = frame
     task.value.pid = @@count &+ 1
+    task.value.parent = @@count == 0 ? 0_u64 : 1_u64
     task.value.state = READY
     @@count = @@count &+ 1
     Console.write("[Kristal] Process pid=")
@@ -127,6 +135,32 @@ module Processes
     block(frame, ticks == 0 ? READY : SLEEPING)
   end
 
+  def self.wait(frame : UInt64*, pid : UInt64, address : UInt64) : UInt64*
+    if pid == 0 || pid > @@count
+      frame[Frame::RAX] = 0_u64 &- 10
+      return frame
+    end
+    child = task(pid)
+    if child.value.parent != @@current.value.pid || child.value.collected != 0
+      frame[Frame::RAX] = 0_u64 &- 10
+      return frame
+    end
+    unless Memory.access(root, address, 8_u64, true)
+      frame[Frame::RAX] = 0_u64 &- 14
+      return frame
+    end
+    if child.value.state == ZOMBIE || child.value.state == DEAD
+      status = child.value.exit_status
+      Memory.copy_user(root, address, pointerof(status).as(UInt8*), 8_u64, true)
+      child.value.collected = 1_u64
+      frame[Frame::RAX] = pid
+      return frame
+    end
+    @@current.value.wait_pid = pid
+    @@current.value.wait_buffer = address
+    block(frame, WAITING)
+  end
+
   def self.wake_sleepers
     i = 0_u64
     while i < @@count
@@ -164,7 +198,7 @@ module Processes
           Memory.unmap_stack(address)
           address = address &+ Memory::PAGE
         end
-        task.value.state = 0_u64
+        task.value.state = DEAD
         task.value.root = 0_u64
         task.value.stack = 0_u64
         task.value.frame = Pointer(UInt64).new(0_u64)
@@ -188,6 +222,25 @@ module Processes
     Console.write(" quanta=")
     Console.hex(@@current.value.quanta)
     Console.write("\n")
+    @@current.value.exit_status = status
+    parent_id = @@current.value.parent
+    if parent_id != 0
+      parent = task(parent_id)
+      if parent.value.state == WAITING && parent.value.wait_pid == @@current.value.pid
+        Memory.copy_user(parent.value.root, parent.value.wait_buffer, pointerof(status).as(UInt8*), 8_u64, true)
+        parent.value.frame[Frame::RAX] = @@current.value.pid
+        parent.value.wait_pid = 0_u64
+        parent.value.wait_buffer = 0_u64
+        parent.value.state = READY
+        @@current.value.collected = 1_u64
+      end
+    end
+    i = 0_u64
+    while i < @@count
+      child = @@table + i.to_i64!
+      child.value.parent = 0_u64 if child.value.parent == @@current.value.pid
+      i = i &+ 1
+    end
     IPC.detach(@@current.value.pid)
     @@current.value.state = ZOMBIE
     schedule

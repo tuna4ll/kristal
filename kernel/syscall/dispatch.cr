@@ -19,6 +19,8 @@ module Syscalls
       return Processes.sleep(frame, frame[9])
     elsif frame[Frame::RAX] == 7
       frame[Frame::RAX] = Display.info(frame[9]).to_u64!
+    elsif frame[Frame::RAX] == 8
+      return Processes.wait(frame, frame[9], frame[8])
     else
       frame[Frame::RAX] = 0_u64 &- 38
     end

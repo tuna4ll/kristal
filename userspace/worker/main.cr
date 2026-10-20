@@ -8,10 +8,6 @@ fun user_main : NoReturn
     User.write("worker: work completed\n")
     round = round &+ 1
   end
-  User.write("worker: notifying init\n")
-  message = uninitialized ABI::Message
-  User.clear(pointerof(message))
-  message.kind = 1_u64
-  User.exit(1_u64) if User.call(2_u64, pointerof(message)) != 0 || message.kind != 0
+  User.write("worker: exiting\n")
   User.exit(0_u64)
 end
