@@ -212,6 +212,12 @@ module Processes
     end
   end
 
+  def self.shutdown(status : UInt64) : NoReturn
+    Console.write("[Kristal] init exited, powering off\n")
+    Arch.debug_exit(status == 0 ? 0x10_u32 : 0x12_u32)
+    Arch.stop
+  end
+
   def self.exit(status : UInt64) : UInt64*
     Console.write("[Kristal] Exit pid=")
     Console.hex(@@current.value.pid)
@@ -235,10 +241,11 @@ module Processes
         @@current.value.collected = 1_u64
       end
     end
+    shutdown(status) if @@current.value.pid == 1
     i = 0_u64
     while i < @@count
       child = @@table + i.to_i64!
-      child.value.parent = 0_u64 if child.value.parent == @@current.value.pid
+      child.value.parent = 1_u64 if child.value.parent == @@current.value.pid
       i = i &+ 1
     end
     IPC.detach(@@current.value.pid)
