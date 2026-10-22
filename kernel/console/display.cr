@@ -37,8 +37,8 @@ module Display
   end
 
   def self.info(address : UInt64) : Int64
-    return 0_i64 &- 1 if Processes.current.value.devices & 1 == 0
-    return 0_i64 &- 19 if @@address == 0
+    return 0_i64 &- Errno::EPERM if Processes.current.value.devices & 1 == 0
+    return 0_i64 &- Errno::ENODEV if @@address == 0
     info = uninitialized ABI::Display
     info.address = BASE &+ (@@address & 4095)
     info.width = @@width
@@ -48,7 +48,7 @@ module Display
     info.green = @@green
     info.blue = @@blue
     info.length = @@pitch &* @@height
-    return 0_i64 &- 14 unless Memory.copy_user(Processes.root, address, pointerof(info).as(UInt8*), 64_u64, true)
+    return 0_i64 &- Errno::EFAULT unless Memory.copy_user(Processes.root, address, pointerof(info).as(UInt8*), 64_u64, true)
     0_i64
   end
 end

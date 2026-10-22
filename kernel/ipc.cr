@@ -61,11 +61,6 @@ module IPC
     @@messages + ((pid &- 1) &* 64).to_i64!
   end
 
-  def self.error(frame : UInt64*, number : UInt64) : UInt64*
-    frame[Frame::RAX] = 0_u64 &- number
-    frame
-  end
-
   def self.wake(pid : UInt64, result : UInt64)
     task = Processes.task(pid)
     task.value.frame[Frame::RAX] = result
@@ -77,22 +72,22 @@ module IPC
 
   def self.call(frame : UInt64*, handle : UInt64, address : UInt64) : UInt64*
     id = resolve(handle, CALL)
-    return error(frame, 1_u64) if id == 0
+    return Syscalls.fail(frame, Errno::EPERM) if id == 0
     ep = endpoint(id)
-    return error(frame, 32_u64) if ep.value.closed != 0
+    return Syscalls.fail(frame, Errno::EPIPE) if ep.value.closed != 0
     task = Processes.current
     pid = task.value.pid
     owner = ep.value.owner
     steps = 0_u64
     while owner != 0 && steps < Processes::MAX
-      return error(frame, 35_u64) if owner == pid
+      return Syscalls.fail(frame, Errno::EDEADLK) if owner == pid
       server = Processes.task(owner)
       break unless server.value.state == Processes::CALLING
       owner = endpoint(server.value.ipc_endpoint).value.owner
       steps = steps &+ 1
     end
-    return error(frame, 35_u64) if steps == Processes::MAX
-    return error(frame, 14_u64) unless Memory.access(task.value.root, address, 64_u64, true)
+    return Syscalls.fail(frame, Errno::EDEADLK) if steps == Processes::MAX
+    return Syscalls.fail(frame, Errno::EFAULT) unless Memory.access(task.value.root, address, 64_u64, true)
     Memory.copy_user(task.value.root, address, message(pid), 64_u64, false)
     task.value.ipc_endpoint = id
     task.value.ipc_buffer = address
@@ -116,13 +111,13 @@ module IPC
 
   def self.receive(frame : UInt64*, handle : UInt64, address : UInt64) : UInt64*
     id = resolve(handle, RECEIVE)
-    return error(frame, 1_u64) if id == 0
+    return Syscalls.fail(frame, Errno::EPERM) if id == 0
     ep = endpoint(id)
     task = Processes.current
-    return error(frame, 1_u64) if ep.value.owner != task.value.pid
-    return error(frame, 32_u64) if ep.value.closed != 0
-    return error(frame, 16_u64) if ep.value.caller != 0
-    return error(frame, 14_u64) unless Memory.access(task.value.root, address, 64_u64, true)
+    return Syscalls.fail(frame, Errno::EPERM) if ep.value.owner != task.value.pid
+    return Syscalls.fail(frame, Errno::EPIPE) if ep.value.closed != 0
+    return Syscalls.fail(frame, Errno::EBUSY) if ep.value.caller != 0
+    return Syscalls.fail(frame, Errno::EFAULT) unless Memory.access(task.value.root, address, 64_u64, true)
     pid = ep.value.head
     if pid != 0
       sender = Processes.task(pid)
@@ -142,12 +137,12 @@ module IPC
 
   def self.reply(frame : UInt64*, handle : UInt64, address : UInt64) : UInt64*
     id = resolve(handle, REPLY)
-    return error(frame, 1_u64) if id == 0
+    return Syscalls.fail(frame, Errno::EPERM) if id == 0
     ep = endpoint(id)
     server = Processes.current
-    return error(frame, 1_u64) if ep.value.owner != server.value.pid
-    return error(frame, 32_u64) if ep.value.closed != 0 || ep.value.caller == 0
-    return error(frame, 14_u64) unless Memory.copy_user(server.value.root, address, message(server.value.pid), 64_u64, false)
+    return Syscalls.fail(frame, Errno::EPERM) if ep.value.owner != server.value.pid
+    return Syscalls.fail(frame, Errno::EPIPE) if ep.value.closed != 0 || ep.value.caller == 0
+    return Syscalls.fail(frame, Errno::EFAULT) unless Memory.copy_user(server.value.root, address, message(server.value.pid), 64_u64, false)
     caller = Processes.task(ep.value.caller)
     Memory.copy_user(caller.value.root, caller.value.ipc_buffer, message(server.value.pid), 64_u64, true)
     wake(ep.value.caller, 0_u64)
@@ -166,10 +161,10 @@ module IPC
         current = ep.value.head
         while current != 0
           following = Processes.task(current).value.ipc_next
-          wake(current, 0_u64 &- 32)
+          wake(current, (0_i64 &- Errno::EPIPE).to_u64!)
           current = following
         end
-        wake(ep.value.caller, 0_u64 &- 32) if ep.value.caller != 0
+        wake(ep.value.caller, (0_i64 &- Errno::EPIPE).to_u64!) if ep.value.caller != 0
         ep.value.head = 0_u64
         ep.value.tail = 0_u64
         ep.value.receiver = 0_u64

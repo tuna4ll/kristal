@@ -126,29 +126,17 @@ module Processes
   end
 
   def self.sleep(frame : UInt64*, ticks : UInt64) : UInt64*
-    if ticks > 6000
-      frame[Frame::RAX] = 0_u64 &- 22
-      return frame
-    end
+    return Syscalls.fail(frame, Errno::EINVAL) if ticks > 6000
     frame[Frame::RAX] = 0_u64
     @@current.value.wake_tick = Timer.ticks &+ ticks
     block(frame, ticks == 0 ? READY : SLEEPING)
   end
 
   def self.wait(frame : UInt64*, pid : UInt64, address : UInt64) : UInt64*
-    if pid == 0 || pid > @@count
-      frame[Frame::RAX] = 0_u64 &- 10
-      return frame
-    end
+    return Syscalls.fail(frame, Errno::ECHILD) if pid == 0 || pid > @@count
     child = task(pid)
-    if child.value.parent != @@current.value.pid || child.value.collected != 0
-      frame[Frame::RAX] = 0_u64 &- 10
-      return frame
-    end
-    unless Memory.access(root, address, 8_u64, true)
-      frame[Frame::RAX] = 0_u64 &- 14
-      return frame
-    end
+    return Syscalls.fail(frame, Errno::ECHILD) if child.value.parent != @@current.value.pid || child.value.collected != 0
+    return Syscalls.fail(frame, Errno::EFAULT) unless Memory.access(root, address, 8_u64, true)
     if child.value.state == ZOMBIE || child.value.state == DEAD
       status = child.value.exit_status
       Memory.copy_user(root, address, pointerof(status).as(UInt8*), 8_u64, true)

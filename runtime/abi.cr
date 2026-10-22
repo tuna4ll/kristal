@@ -22,3 +22,28 @@ lib ABI
     length : UInt64
   end
 end
+
+module Sys
+  EXIT    = 1_u64
+  SLEEP   = 2_u64
+  WAIT    = 3_u64
+  CALL    = 4_u64
+  RECEIVE = 5_u64
+  REPLY   = 6_u64
+  DISPLAY = 7_u64
+end
+
+# linux numbering, so a future libc can pass these through unchanged
+module Errno
+  EPERM   =  1_i64
+  ESRCH   =  3_i64
+  ECHILD  = 10_i64
+  ENOMEM  = 12_i64
+  EFAULT  = 14_i64
+  EBUSY   = 16_i64
+  ENODEV  = 19_i64
+  EINVAL  = 22_i64
+  EPIPE   = 32_i64
+  EDEADLK = 35_i64
+  ENOSYS  = 38_i64
+end

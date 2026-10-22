@@ -14,9 +14,9 @@ fun user_entry_code
 end
 
 module Syscall
-  def self.invoke(number : UInt64, arg1 : UInt64, arg2 : UInt64) : Int64
+  def self.invoke(number : UInt64, a : UInt64, b : UInt64, c : UInt64, d : UInt64, e : UInt64, f : UInt64) : Int64
     result = 0_i64
-    asm("int $$0x80" : "={rax}"(result) : "{rax}"(number), "{rdi}"(arg1), "{rsi}"(arg2) : "memory" : "volatile")
+    asm("int $$0x80" : "={rax}"(result) : "{rax}"(number), "{rdi}"(a), "{rsi}"(b), "{rdx}"(c), "{r10}"(d), "{r8}"(e), "{r9}"(f) : "memory" : "volatile")
     result
   end
 end
@@ -52,28 +52,32 @@ module User
     end
   end
 
+  def self.invoke(number : UInt64, a : UInt64 = 0_u64, b : UInt64 = 0_u64, c : UInt64 = 0_u64, d : UInt64 = 0_u64, e : UInt64 = 0_u64, f : UInt64 = 0_u64) : Int64
+    Syscall.invoke(number, a, b, c, d, e, f)
+  end
+
   def self.call(handle : UInt64, message : ABI::Message*) : Int64
-    Syscall.invoke(3_u64, handle, message.address)
+    invoke(Sys::CALL, handle, message.address)
   end
 
   def self.receive(handle : UInt64, message : ABI::Message*) : Int64
-    Syscall.invoke(4_u64, handle, message.address)
+    invoke(Sys::RECEIVE, handle, message.address)
   end
 
   def self.reply(handle : UInt64, message : ABI::Message*) : Int64
-    Syscall.invoke(5_u64, handle, message.address)
+    invoke(Sys::REPLY, handle, message.address)
   end
 
   def self.wait(pid : UInt64, status : UInt64*) : Int64
-    Syscall.invoke(8_u64, pid, status.address)
+    invoke(Sys::WAIT, pid, status.address)
   end
 
   def self.sleep(ticks : UInt64)
-    exit(1_u64) if Syscall.invoke(6_u64, ticks, 0_u64) != 0
+    exit(1_u64) if invoke(Sys::SLEEP, ticks) != 0
   end
 
   def self.exit(status : UInt64) : NoReturn
-    Syscall.invoke(2_u64, status, 0_u64)
+    invoke(Sys::EXIT, status)
     while true
       asm("ud2" ::: "memory" : "volatile")
     end

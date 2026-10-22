@@ -22,10 +22,10 @@ end
 
 fun user_main : NoReturn
   display = uninitialized ABI::Display
-  result = Syscall.invoke(7_u64, pointerof(display).address, 0_u64)
+  result = User.invoke(Sys::DISPLAY, pointerof(display).address)
   if result == 0
     User.exit(1_u64) unless Screen.init(display.address, display.width, display.height, display.pitch, display.red, display.green, display.blue)
-  elsif result != (0_i64 &- 19)
+  elsif result != 0_i64 &- Errno::ENODEV
     User.exit(1_u64)
   end
   message = uninitialized ABI::Message

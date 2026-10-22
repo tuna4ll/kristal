@@ -1,4 +1,10 @@
 module Frame
+  R10    =  5
+  R9     =  6
+  R8     =  7
+  RSI    =  8
+  RDI    =  9
+  RDX    = 11
   RAX    = 14
   VECTOR = 15
   ERROR  = 16
