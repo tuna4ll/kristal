@@ -31,13 +31,17 @@ end
 
 module Console
   @@screen = false
+  @@serial = true
 
+  # after handoff the serial port belongs to the console service
   def self.handoff
     @@screen = false
+    @@serial = false
   end
 
   def self.emergency
     @@screen = true
+    @@serial = true
   end
 
   def self.hex(value : UInt64)
@@ -61,6 +65,10 @@ module Console
   end
 
   def self.byte(value : UInt8)
+    unless @@serial
+      Arch.port_out(0xe9_u16, value)
+      return
+    end
     while Arch.port_in(0x3fd_u16) & 0x20 == 0
     end
     Arch.port_out(0x3f8_u16, value)

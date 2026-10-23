@@ -5,7 +5,8 @@ import sys
 QEMU = [
     "qemu-system-x86_64", "-machine", "q35", "-cpu", "qemu64,+nx", "-m", "128M",
     "-display", "none", "-serial", "stdio", "-monitor", "none", "-no-reboot",
-    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-cdrom", "build/kristal.iso",
+    "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-debugcon", "file:build/kernel.log",
+    "-cdrom", "build/kristal.iso",
 ]
 
 EXPECT = [
@@ -24,6 +25,8 @@ def main():
         print("test: timed out")
         return 1
     output = run.stdout.decode(errors="replace")
+    with open("build/kernel.log", errors="replace") as log:
+        output += log.read()
     sys.stdout.write(output)
     missing = [line for line in EXPECT if line not in output]
     for line in missing:
