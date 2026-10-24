@@ -32,21 +32,12 @@ struct Int
   end
 end
 
-# Volatile stores prevent LLVM from lowering this loop to a recursive memset.
 fun memset(dest : UInt8*, value : Int32, size : UInt64) : UInt8*
-  i = 0_u64
-  while i < size
-    asm("movb $1, ($0)" :: "r"(dest + i.to_i64!), "r"(value.to_u8!) : "memory" : "volatile")
-    i = i &+ 1
-  end
+  asm("movq $0, %rdi; movl $1, %eax; movq $2, %rcx; rep stosb" :: "r"(dest), "r"(value), "r"(size) : "rdi", "rax", "rcx", "memory" : "volatile")
   dest
 end
 
 fun memcpy(dest : UInt8*, src : UInt8*, size : UInt64) : UInt8*
-  i = 0_u64
-  while i < size
-    asm("movb $1, ($0)" :: "r"(dest + i.to_i64!), "r"(src[i]) : "memory" : "volatile")
-    i = i &+ 1
-  end
+  asm("movq $0, %rdi; movq $1, %rsi; movq $2, %rcx; rep movsb" :: "r"(dest), "r"(src), "r"(size) : "rdi", "rsi", "rcx", "memory" : "volatile")
   dest
 end
