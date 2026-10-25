@@ -16,7 +16,7 @@ module Syscalls
     a = frame[Frame::RDI]
     b = frame[Frame::RSI]
     if number == Sys::EXIT
-      return Processes.exit(a)
+      return Processes.exit((a & 255) << 8)
     elsif number == Sys::SLEEP
       return Processes.sleep(frame, a)
     elsif number == Sys::WAIT

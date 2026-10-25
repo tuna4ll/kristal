@@ -26,8 +26,12 @@ module IPC
 
   def self.init
     @@endpoints = Memory.alloc.as(Kernel::Endpoint*)
-    @@caps = Memory.alloc.as(Kernel::Capability*)
+    @@caps = Memory.alloc_pages(Processes::MAX &* SLOTS &* 16 >> 12).as(Kernel::Capability*)
     @@messages = Memory.alloc.as(UInt8*)
+  end
+
+  def self.cap(task : Kernel::Process*, handle : UInt64) : Kernel::Capability*
+    @@caps + ((task.value.slot &* SLOTS) &+ handle &- 1).to_i64!
   end
 
   def self.create(owner : UInt64) : UInt64
@@ -43,22 +47,21 @@ module IPC
   end
 
   def self.grant(pid : UInt64, handle : UInt64, id : UInt64, rights : UInt64)
-    panic("invalid capability grant") if pid == 0 || pid > Processes::MAX || handle == 0 || handle > SLOTS || id == 0 || id > @@count
-    cap = @@caps + (((pid &- 1) &* SLOTS) &+ handle &- 1).to_i64!
+    panic("invalid capability grant") if handle == 0 || handle > SLOTS || id == 0 || id > @@count
+    cap = cap(Processes.task(pid), handle)
     cap.value.endpoint = id
     cap.value.rights = rights
   end
 
   def self.resolve(handle : UInt64, right : UInt64) : UInt64
     return 0_u64 if handle == 0 || handle > SLOTS
-    index = ((Processes.current.value.pid &- 1) &* SLOTS) &+ handle &- 1
-    cap = @@caps + index.to_i64!
+    cap = cap(Processes.current, handle)
     return 0_u64 if cap.value.rights & right == 0
     cap.value.endpoint
   end
 
   def self.message(pid : UInt64) : UInt8*
-    @@messages + ((pid &- 1) &* 64).to_i64!
+    @@messages + (Processes.task(pid).value.slot &* 64).to_i64!
   end
 
   def self.wake(pid : UInt64, result : UInt64)
@@ -152,7 +155,8 @@ module IPC
     frame
   end
 
-  def self.detach(pid : UInt64)
+  def self.detach(task : Kernel::Process*)
+    pid = task.value.pid
     id = 1_u64
     while id <= @@count
       ep = endpoint(id)
@@ -190,12 +194,11 @@ module IPC
       end
       id = id &+ 1
     end
-    slot = 0_u64
-    while slot < SLOTS
-      cap = @@caps + (((pid &- 1) &* SLOTS) &+ slot).to_i64!
-      cap.value.rights = 0_u64
-      cap.value.endpoint = 0_u64
-      slot = slot &+ 1
+    handle = 1_u64
+    while handle <= SLOTS
+      cap(task, handle).value.rights = 0_u64
+      cap(task, handle).value.endpoint = 0_u64
+      handle = handle &+ 1
     end
   end
 end

@@ -1,5 +1,5 @@
 module Display
-  BASE = 0x60000000_u64
+  BASE = Layout::DEVICE
   @@address = 0_u64
   @@width = 0_u64
   @@height = 0_u64

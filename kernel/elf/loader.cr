@@ -1,7 +1,7 @@
 module ELF
-  MIN   =    0x10000_u64
-  MAX   = 0x50000000_u64
-  STACK = 0x7ffff000_u64
+  MIN   = Layout::IMAGE
+  MAX   = Layout::IMAGE_END
+  STACK = Layout::STACK
 
   def self.number(data : UInt8*, offset : UInt64, width : Int32) : UInt64
     value = 0_u64

@@ -159,6 +159,13 @@ module CPU
   end
 end
 
+def signal(vector : UInt64) : UInt64
+  return 8_u64 if vector == 0 || vector == 16 || vector == 19
+  return 5_u64 if vector == 1 || vector == 3
+  return 4_u64 if vector == 6 || vector == 7
+  11_u64
+end
+
 def exception(frame : UInt64*) : UInt64*
   Console.write("[Kristal] Exception vector=")
   Console.hex(frame[Frame::VECTOR])
@@ -173,7 +180,7 @@ def exception(frame : UInt64*) : UInt64*
   Console.write("\n")
   vector = frame[Frame::VECTOR]
   if frame[Frame::CS] == 0x23 && vector != 2 && vector != 8 && vector != 18
-    return Processes.exit(128_u64 &+ vector)
+    return Processes.exit(signal(vector))
   end
   Arch.debug_exit(0x11_u32)
   Arch.stop

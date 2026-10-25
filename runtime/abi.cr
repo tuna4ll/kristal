@@ -23,6 +23,10 @@ lib ABI
   end
 end
 
+module Wait
+  ANY = 0xffffffffffffffff_u64
+end
+
 module Sys
   EXIT    = 1_u64
   SLEEP   = 2_u64
@@ -46,4 +50,15 @@ module Errno
   EPIPE   = 32_i64
   EDEADLK = 35_i64
   ENOSYS  = 38_i64
+end
+
+module Layout
+  IMAGE     =          0x10000_u64
+  IMAGE_END =       0x40000000_u64
+  MAP       =     0x1000000000_u64
+  DEVICE    =   0x700000000000_u64
+  INITRD    =   0x710000000000_u64
+  STACK     =   0x7fffffff0000_u64
+  STACK_MAX =        0x800000_u64
+  END       =   0x800000000000_u64
 end
