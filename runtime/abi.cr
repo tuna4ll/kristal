@@ -23,6 +23,17 @@ lib ABI
   end
 end
 
+module Aux
+  PHDR   =      3_u64
+  PHENT  =      4_u64
+  PHNUM  =      5_u64
+  PAGESZ =      6_u64
+  ENTRY  =      9_u64
+  RANDOM =     25_u64
+  DATA   = 0x4b00_u64
+  SIZE   = 0x4b01_u64
+end
+
 module Wait
   ANY = 0xffffffffffffffff_u64
 end
@@ -40,13 +51,24 @@ end
 # linux numbering, so a future libc can pass these through unchanged
 module Errno
   EPERM   =  1_i64
+  ENOENT  =  2_i64
   ESRCH   =  3_i64
+  E2BIG   =  7_i64
+  ENOEXEC =  8_i64
+  EBADF   =  9_i64
   ECHILD  = 10_i64
   ENOMEM  = 12_i64
   EFAULT  = 14_i64
   EBUSY   = 16_i64
+  EEXIST  = 17_i64
   ENODEV  = 19_i64
+  ENOTDIR = 20_i64
+  EISDIR  = 21_i64
   EINVAL  = 22_i64
+  EMFILE  = 24_i64
+  ENOTTY  = 25_i64
+  ENOSPC  = 28_i64
+  ESPIPE  = 29_i64
   EPIPE   = 32_i64
   EDEADLK = 35_i64
   ENOSYS  = 38_i64

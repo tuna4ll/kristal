@@ -90,17 +90,24 @@ module Processes
     Pointer(Kernel::Process).new(0_u64)
   end
 
-  def self.create(file : UInt64*, devices : UInt64 = 0_u64)
+  def self.create(file : UInt64*, name : String, devices : UInt64 = 0_u64)
     task = allocate
     panic("process limit") if task.address == 0
     root = Memory.create_space
-    entry = ELF.load(root, Pointer(UInt8).new(file[1]), file[2])
+    entry = ELF.load(root, 0_u64, file[1], file[2])
+    panic("boot module is not a valid executable") if entry < 0
+    args = uninitialized UInt64[2]
+    argv = pointerof(args).as(UInt64*)
+    argv[0] = name.to_unsafe.address
+    argv[1] = 0_u64
+    sp = ELF.stack(root, 0_u64, argv.address, 0_u64, 0_u64, 0_u64)
+    panic("boot module stack") if sp < 0
     Display.grant(root) if devices & 1 != 0
     frame = Pointer(UInt64).new(task.value.stack &- (Frame::WORDS.to_u64! &* 8))
-    frame[Frame::RIP] = entry
+    frame[Frame::RIP] = entry.to_u64!
     frame[Frame::CS] = 0x23_u64
     frame[Frame::FLAGS] = 0x202_u64
-    frame[Frame::RSP] = ELF::STACK
+    frame[Frame::RSP] = sp.to_u64!
     frame[Frame::SS] = 0x1b_u64
     task.value.devices = devices
     task.value.root = root

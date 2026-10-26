@@ -101,12 +101,10 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   files = Pointer(UInt64).new(modules[2])
   Processes.init
   IPC.init
-  i = 0_u64
-  while i < modules[1]
-    Console.write("[Kristal] Loading userspace ELF\n")
-    Processes.create(Pointer(UInt64).new(files[i]), i == 1 ? 1_u64 : 0_u64)
-    i = i &+ 1
-  end
+  Console.write("[Kristal] Loading userspace ELF\n")
+  Processes.create(Pointer(UInt64).new(files[0]), "init")
+  Processes.create(Pointer(UInt64).new(files[1]), "console", 1_u64)
+  Processes.create(Pointer(UInt64).new(files[2]), "worker")
   endpoint = IPC.create(2_u64)
   IPC.grant(1_u64, 1_u64, endpoint, IPC::CALL)
   IPC.grant(2_u64, 1_u64, endpoint, IPC::RECEIVE | IPC::REPLY)
