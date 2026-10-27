@@ -15,6 +15,8 @@ module Syscalls
     number = frame[Frame::RAX]
     a = frame[Frame::RDI]
     b = frame[Frame::RSI]
+    c = frame[Frame::RDX]
+    d = frame[Frame::R10]
     if number == Sys::EXIT
       return Processes.exit((a & 255) << 8)
     elsif number == Sys::SLEEP
@@ -22,11 +24,15 @@ module Syscalls
     elsif number == Sys::WAIT
       return Processes.wait(frame, a, b)
     elsif number == Sys::CALL
-      return IPC.call(frame, a, b)
+      return IPC.call(frame, a, b, c, d)
     elsif number == Sys::RECEIVE
-      return IPC.receive(frame, a, b)
+      return IPC.receive(frame, a, b, c, d)
     elsif number == Sys::REPLY
-      return IPC.reply(frame, a, b)
+      return IPC.reply(frame, a, b, c, d)
+    elsif number == Sys::ENDPOINT
+      return IPC.create(frame)
+    elsif number == Sys::CLOSE
+      return IPC.close(frame, a)
     elsif number == Sys::DISPLAY
       frame[Frame::RAX] = Display.info(a).to_u64!
     else

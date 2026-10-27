@@ -9,8 +9,14 @@ lib Kernel
     quanta : UInt64
     wake_tick : UInt64
     ipc_endpoint : UInt64
+    ipc_message : UInt64
     ipc_buffer : UInt64
+    ipc_length : UInt64
+    ipc_capacity : UInt64
     ipc_next : UInt64
+    ipc_served : UInt64
+    ipc_cap : UInt64
+    ipc_rights : UInt64
     devices : UInt64
     parent : UInt64
     exit_status : UInt64
@@ -90,7 +96,7 @@ module Processes
     Pointer(Kernel::Process).new(0_u64)
   end
 
-  def self.create(file : UInt64*, name : String, devices : UInt64 = 0_u64)
+  def self.create(file : UInt64*, name : String, devices : UInt64 = 0_u64) : Kernel::Process*
     task = allocate
     panic("process limit") if task.address == 0
     root = Memory.create_space
@@ -119,6 +125,7 @@ module Processes
     Console.write(" cr3=")
     Console.hex(root)
     Console.write("\n")
+    task
   end
 
   def self.root : UInt64

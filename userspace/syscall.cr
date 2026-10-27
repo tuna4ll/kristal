@@ -25,47 +25,30 @@ module User
   def self.write(text : String)
     message = uninitialized ABI::Message
     clear(pointerof(message))
-    done = 0_u64
+    message.tag = Op::WRITE
     length = text.bytesize.to_u64!
-    while done < length
-      count = length &- done
-      count = 48_u64 if count > 48
-      message.kind = 1_u64
-      message.size = count
-      bytes = pointerof(message).as(UInt8*) + 16_i64
-      i = 0_u64
-      while i < count
-        bytes[i] = text.to_unsafe[done &+ i]
-        i = i &+ 1
-      end
-      exit(1_u64) if call(1_u64, pointerof(message)) != 0 || message.kind != 0 || message.size != count
-      done = done &+ count
-    end
+    message.length = length
+    exit(1_u64) if call(1_u64, pointerof(message), text.to_unsafe, 0_u64) != 0 || message.tag != length
   end
 
   def self.clear(message : ABI::Message*)
-    p = message.as(UInt64*)
-    i = 0
-    while i < 8
-      p[i] = 0_u64
-      i = i &+ 1
-    end
+    memset(message.as(UInt8*), 0, 64_u64)
   end
 
   def self.invoke(number : UInt64, a : UInt64 = 0_u64, b : UInt64 = 0_u64, c : UInt64 = 0_u64, d : UInt64 = 0_u64, e : UInt64 = 0_u64, f : UInt64 = 0_u64) : Int64
     Syscall.invoke(number, a, b, c, d, e, f)
   end
 
-  def self.call(handle : UInt64, message : ABI::Message*) : Int64
-    invoke(Sys::CALL, handle, message.address)
+  def self.call(handle : UInt64, message : ABI::Message*, buffer : UInt8*, capacity : UInt64) : Int64
+    invoke(Sys::CALL, handle, message.address, buffer.address, capacity)
   end
 
-  def self.receive(handle : UInt64, message : ABI::Message*) : Int64
-    invoke(Sys::RECEIVE, handle, message.address)
+  def self.receive(handle : UInt64, message : ABI::Message*, buffer : UInt8*, capacity : UInt64) : Int64
+    invoke(Sys::RECEIVE, handle, message.address, buffer.address, capacity)
   end
 
-  def self.reply(handle : UInt64, message : ABI::Message*) : Int64
-    invoke(Sys::REPLY, handle, message.address)
+  def self.reply(handle : UInt64, pid : UInt64, message : ABI::Message*, buffer : UInt8*) : Int64
+    invoke(Sys::REPLY, handle, pid, message.address, buffer.address)
   end
 
   def self.wait(pid : UInt64, status : UInt64*) : Int64

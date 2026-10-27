@@ -29,26 +29,24 @@ fun user_main : NoReturn
     User.exit(1_u64)
   end
   message = uninitialized ABI::Message
+  buffer = uninitialized UInt8[4096]
+  data = pointerof(buffer).as(UInt8*)
   while true
-    sender = User.receive(1_u64, pointerof(message))
+    sender = User.receive(1_u64, pointerof(message), data, 4096_u64)
     User.exit(1_u64) if sender < 0
-    close = false
-    if message.kind == 1 && message.size <= 48
-      bytes = pointerof(message).as(UInt8*) + 16_i64
+    next if sender == 0
+    if message.tag == Op::WRITE
       i = 0_u64
-      while i < message.size
-        put(bytes[i])
+      while i < message.length
+        put(data[i])
         i = i &+ 1
       end
-      message.kind = 0_u64
-    elsif message.kind == 2 && sender == 1
-      close = true
-      message.kind = 0_u64
+      message.tag = message.length
     else
-      message.kind = 22_u64
-      message.size = 0_u64
+      message.tag = (0_i64 &- Errno::EINVAL).to_u64!
     end
-    User.exit(1_u64) if User.reply(1_u64, pointerof(message)) != 0
-    User.exit(0_u64) if close
+    message.length = 0_u64
+    message.cap = 0_u64
+    User.exit(1_u64) if User.reply(1_u64, sender.to_u64!, pointerof(message), data) != 0
   end
 end

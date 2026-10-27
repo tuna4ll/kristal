@@ -102,13 +102,13 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   Processes.init
   IPC.init
   Console.write("[Kristal] Loading userspace ELF\n")
-  Processes.create(Pointer(UInt64).new(files[0]), "init")
-  Processes.create(Pointer(UInt64).new(files[1]), "console", 1_u64)
-  Processes.create(Pointer(UInt64).new(files[2]), "worker")
-  endpoint = IPC.create(2_u64)
-  IPC.grant(1_u64, 1_u64, endpoint, IPC::CALL)
-  IPC.grant(2_u64, 1_u64, endpoint, IPC::RECEIVE | IPC::REPLY)
-  IPC.grant(3_u64, 1_u64, endpoint, IPC::CALL)
+  init = Processes.create(Pointer(UInt64).new(files[0]), "init")
+  console = Processes.create(Pointer(UInt64).new(files[1]), "console", 1_u64)
+  worker = Processes.create(Pointer(UInt64).new(files[2]), "worker")
+  endpoint = IPC.allocate
+  IPC.grant(console, endpoint, IPC::RECEIVE)
+  IPC.grant(init, endpoint, IPC::CALL)
+  IPC.grant(worker, endpoint, IPC::CALL)
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
   Console.write("[Kristal] Round-robin: 50 ms quantum\n")

@@ -1,14 +1,14 @@
 lib ABI
-  # IPC copies exactly 64 bytes; the last 48 bytes are protocol payload.
+  # tag is the request on a call and the result on a reply
   struct Message
-    kind : UInt64
-    size : UInt64
+    tag : UInt64
+    cap : UInt64
+    length : UInt64
     a : UInt64
     b : UInt64
     c : UInt64
     d : UInt64
     e : UInt64
-    f : UInt64
   end
 
   struct Display
@@ -39,13 +39,28 @@ module Wait
 end
 
 module Sys
-  EXIT    = 1_u64
-  SLEEP   = 2_u64
-  WAIT    = 3_u64
-  CALL    = 4_u64
-  RECEIVE = 5_u64
-  REPLY   = 6_u64
-  DISPLAY = 7_u64
+  EXIT     = 1_u64
+  SLEEP    = 2_u64
+  WAIT     = 3_u64
+  CALL     = 4_u64
+  RECEIVE  = 5_u64
+  REPLY    = 6_u64
+  DISPLAY  = 7_u64
+  ENDPOINT = 8_u64
+  CLOSE    = 9_u64
+end
+
+module Op
+  READ     =  1_u64
+  WRITE    =  2_u64
+  OPEN     =  3_u64
+  CLOSE    =  4_u64
+  DUP      =  5_u64
+  STAT     =  6_u64
+  FSTAT    =  7_u64
+  GETDENTS =  8_u64
+  SEEK     =  9_u64
+  IOCTL    = 10_u64
 end
 
 # linux numbering, so a future libc can pass these through unchanged
