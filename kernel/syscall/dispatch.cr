@@ -17,6 +17,8 @@ module Syscalls
     b = frame[Frame::RSI]
     c = frame[Frame::RDX]
     d = frame[Frame::R10]
+    e = frame[Frame::R8]
+    f = frame[Frame::R9]
     if number == Sys::EXIT
       return Processes.exit((a & 255) << 8)
     elsif number == Sys::SLEEP
@@ -33,6 +35,17 @@ module Syscalls
       return IPC.create(frame)
     elsif number == Sys::CLOSE
       return IPC.close(frame, a)
+    elsif number == Sys::FORK
+      return Processes.fork(frame)
+    elsif number == Sys::EXEC
+      return Processes.exec(frame, a, b, c, d, e, f)
+    elsif number == Sys::MAP
+      return Processes.map(frame, a, b, c)
+    elsif number == Sys::UNMAP
+      return Processes.unmap(frame, a, b)
+    elsif number == Sys::PID
+      task = Processes.current
+      frame[Frame::RAX] = a == 0 ? task.value.pid : task.value.parent
     elsif number == Sys::DISPLAY
       frame[Frame::RAX] = Display.info(a).to_u64!
     else

@@ -11,6 +11,9 @@ QEMU = [
 
 EXPECT = [
     "Hello World from Userspace",
+    "worker: child exited with 3",
+    "worker: mapped memory",
+    "worker: stack grew",
     "worker: exiting",
     "init: worker exited normally",
     "[Kristal] init exited, powering off",

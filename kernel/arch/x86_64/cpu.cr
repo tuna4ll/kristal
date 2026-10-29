@@ -167,6 +167,9 @@ def signal(vector : UInt64) : UInt64
 end
 
 def exception(frame : UInt64*) : UInt64*
+  if frame[Frame::VECTOR] == 14 && frame[Frame::CS] == 0x23 && frame[Frame::ERROR] & 1 == 0
+    return frame if Processes.grow(Arch.read_cr2)
+  end
   Console.write("[Kristal] Exception vector=")
   Console.hex(frame[Frame::VECTOR])
   Console.write(" error=")

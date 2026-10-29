@@ -48,6 +48,11 @@ module Sys
   DISPLAY  = 7_u64
   ENDPOINT = 8_u64
   CLOSE    = 9_u64
+  FORK     = 10_u64
+  EXEC     = 11_u64
+  MAP      = 12_u64
+  UNMAP    = 13_u64
+  PID      = 14_u64
 end
 
 module Op
@@ -72,6 +77,7 @@ module Errno
   ENOEXEC =  8_i64
   EBADF   =  9_i64
   ECHILD  = 10_i64
+  EAGAIN  = 11_i64
   ENOMEM  = 12_i64
   EFAULT  = 14_i64
   EBUSY   = 16_i64

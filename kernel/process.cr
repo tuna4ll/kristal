@@ -128,6 +128,89 @@ module Processes
     task
   end
 
+  def self.fork(frame : UInt64*) : UInt64*
+    parent = @@current
+    return Syscalls.fail(frame, Errno::ENOMEM) unless Memory.reserve(Memory.count(parent.value.root) &+ 8)
+    child = allocate
+    return Syscalls.fail(frame, Errno::EAGAIN) if child.address == 0
+    copy = Pointer(UInt64).new(child.value.stack &- (Frame::WORDS.to_u64! &* 8))
+    memcpy(copy.as(UInt8*), frame.as(UInt8*), Frame::WORDS.to_u64! &* 8)
+    copy[Frame::RAX] = 0_u64
+    child.value.frame = copy
+    child.value.root = Memory.clone_space(parent.value.root)
+    child.value.devices = parent.value.devices
+    child.value.parent = parent.value.pid
+    IPC.fork(parent, child)
+    child.value.state = READY
+    frame[Frame::RAX] = child.value.pid
+    frame
+  end
+
+  # the old image stays intact until the new one has fully loaded
+  def self.exec(frame : UInt64*, image : UInt64, length : UInt64, argv : UInt64, envp : UInt64, data : UInt64, size : UInt64) : UInt64*
+    task = @@current
+    root = Memory.create_space
+    entry = ELF.load(root, task.value.root, image, length)
+    sp = entry < 0 ? entry : ELF.stack(root, task.value.root, argv, envp, data, size)
+    if sp < 0
+      Memory.destroy_space(root)
+      return Syscalls.fail(frame, 0_i64 &- sp)
+    end
+    old = task.value.root
+    task.value.root = root
+    Arch.write_cr3(root)
+    Memory.destroy_space(old)
+    memset(frame.as(UInt8*), 0, Frame::WORDS.to_u64! &* 8)
+    frame[Frame::RIP] = entry.to_u64!
+    frame[Frame::CS] = 0x23_u64
+    frame[Frame::FLAGS] = 0x202_u64
+    frame[Frame::RSP] = sp.to_u64!
+    frame[Frame::SS] = 0x1b_u64
+    frame
+  end
+
+  def self.map(frame : UInt64*, address : UInt64, length : UInt64, flags : UInt64) : UInt64*
+    return Syscalls.fail(frame, Errno::EINVAL) if address & 4095 != 0 || length == 0 || flags & ~3_u64 != 0 || flags == 3
+    length = (length &+ 4095) & ~4095_u64
+    return Syscalls.fail(frame, Errno::EINVAL) if address < Layout::IMAGE || address >= Layout::DEVICE || length > Layout::DEVICE &- address
+    return Syscalls.fail(frame, Errno::ENOMEM) unless Memory.reserve((length >> 12) &+ (length >> 20) &+ 4)
+    page = address
+    while page < address &+ length
+      entry = Memory.walk(root, page, false)
+      return Syscalls.fail(frame, Errno::EEXIST) if entry.address != 0 && entry.value & 1 != 0
+      page = page &+ Memory::PAGE
+    end
+    permission = flags & 1 != 0 ? Memory::WRITE : 0_u64
+    permission = permission | Memory::NX if flags & 2 == 0
+    page = address
+    while page < address &+ length
+      Memory.map(root, page, Memory.page, permission)
+      page = page &+ Memory::PAGE
+    end
+    frame[Frame::RAX] = 0_u64
+    frame
+  end
+
+  def self.unmap(frame : UInt64*, address : UInt64, length : UInt64) : UInt64*
+    return Syscalls.fail(frame, Errno::EINVAL) if address & 4095 != 0 || address < Layout::IMAGE || length > Layout::END &- address
+    page = address
+    while page < address &+ length
+      Memory.unmap(root, page)
+      page = page &+ Memory::PAGE
+    end
+    frame[Frame::RAX] = 0_u64
+    frame
+  end
+
+  def self.grow(address : UInt64) : Bool
+    return false if address >= Layout::STACK || address < Layout::STACK &- Layout::STACK_MAX
+    return false unless Memory.reserve(4_u64)
+    entry = Memory.walk(root, address & ~4095_u64, true)
+    return false if entry.value & 1 != 0
+    entry.value = Memory.page | Memory::NX | Memory::WRITE | 5_u64
+    true
+  end
+
   def self.root : UInt64
     @@current.value.root
   end
