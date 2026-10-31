@@ -46,8 +46,12 @@ module Syscalls
     elsif number == Sys::PID
       task = Processes.current
       frame[Frame::RAX] = a == 0 ? task.value.pid : task.value.parent
-    elsif number == Sys::DISPLAY
-      frame[Frame::RAX] = Display.info(a).to_u64!
+    elsif number == Sys::DEVICE
+      return Devices.request(frame, a, b)
+    elsif number == Sys::DROP
+      return Devices.drop(frame, a)
+    elsif number == Sys::IRQ
+      return Devices.bind(frame, a, b)
     else
       return fail(frame, Errno::ENOSYS)
     end

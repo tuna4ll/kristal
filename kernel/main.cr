@@ -5,6 +5,7 @@ require "../runtime/screen"
 require "./console/display"
 require "./process"
 require "./ipc"
+require "./devices"
 require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
@@ -103,7 +104,7 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   IPC.init
   Console.write("[Kristal] Loading userspace ELF\n")
   init = Processes.create(Pointer(UInt64).new(files[0]), "init")
-  console = Processes.create(Pointer(UInt64).new(files[1]), "console", 1_u64)
+  console = Processes.create(Pointer(UInt64).new(files[1]), "console", Device::DISPLAY | Device::SERIAL | Device::KEYBOARD)
   worker = Processes.create(Pointer(UInt64).new(files[2]), "worker")
   endpoint = IPC.allocate
   IPC.grant(console, endpoint, IPC::RECEIVE)

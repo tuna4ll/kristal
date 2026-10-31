@@ -108,7 +108,6 @@ module Processes
     argv[1] = 0_u64
     sp = ELF.stack(root, 0_u64, argv.address, 0_u64, 0_u64, 0_u64)
     panic("boot module stack") if sp < 0
-    Display.grant(root) if devices & 1 != 0
     frame = Pointer(UInt64).new(task.value.stack &- (Frame::WORDS.to_u64! &* 8))
     frame[Frame::RIP] = entry.to_u64!
     frame[Frame::CS] = 0x23_u64
@@ -221,7 +220,7 @@ module Processes
     task.value.state = RUNNING
     @@slice = 0_u64
     CPU.set_stack(task.value.stack)
-    CPU.set_io(task.value.devices & 1 != 0)
+    CPU.set_io(task.value.devices)
     Arch.write_cr3(task.value.root)
     task.value.frame
   end
@@ -416,7 +415,7 @@ end
 fun idle_main : NoReturn
   Processes.reap
   CPU.set_stack(Arch.stack_address)
-  CPU.set_io(false)
+  CPU.set_io(0_u64)
   while true
     chosen = Processes.next_ready
     Arch.resume(Processes.activate(chosen)) if chosen.address != 0

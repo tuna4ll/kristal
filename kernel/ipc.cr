@@ -75,6 +75,7 @@ module IPC
     entry.value.rights = 0_u64
     ep.value.refs = ep.value.refs &- 1
     if ep.value.refs == 0
+      Devices.unbind(id)
       memset(ep.as(UInt8*), 0, sizeof(Kernel::Endpoint).to_u64!)
     end
   end

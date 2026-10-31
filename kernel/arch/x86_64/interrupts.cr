@@ -43,20 +43,31 @@ module Timer
     Arch.port_out(0x40_u16, 0x2e_u8)
   end
 
-  def self.interrupt(vector : UInt64)
+  def self.mask(line : UInt64)
+    port = line < 8 ? 0x21_u16 : 0xa1_u16
+    Arch.port_out(port, Arch.port_in(port) | (1_u8 << (line & 7)))
+  end
+
+  def self.unmask(line : UInt64)
+    port = line < 8 ? 0x21_u16 : 0xa1_u16
+    Arch.port_out(port, Arch.port_in(port) & ~(1_u8 << (line & 7)))
+  end
+
+  def self.interrupt(vector : UInt64) : Bool
     if vector == 39
       Arch.port_out(0x20_u16, 0x0b_u8)
-      return if Arch.port_in(0x20_u16) & 0x80 == 0
+      return false if Arch.port_in(0x20_u16) & 0x80 == 0
     elsif vector == 47
       Arch.port_out(0xa0_u16, 0x0b_u8)
       if Arch.port_in(0xa0_u16) & 0x80 == 0
         Arch.port_out(0x20_u16, 0x20_u8)
-        return
+        return false
       end
     end
     @@ticks = @@ticks &+ 1 if vector == 32
     Arch.port_out(0xa0_u16, 0x20_u8) if vector >= 40
     Arch.port_out(0x20_u16, 0x20_u8)
+    true
   end
 
   def self.ticks : UInt64
@@ -70,11 +81,12 @@ fun interrupt_dispatch(frame : UInt64*) : UInt64*
   if vector == 128
     return Syscalls.dispatch(frame)
   elsif vector >= 32 && vector < 48
-    Timer.interrupt(vector)
+    return frame unless Timer.interrupt(vector)
     if vector == 32
       Processes.wake_sleepers
       return Processes.tick(frame)
     end
+    Devices.interrupt(vector &- 32)
   else
     return exception(frame)
   end

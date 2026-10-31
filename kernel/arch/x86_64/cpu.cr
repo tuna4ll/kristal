@@ -121,8 +121,9 @@ module CPU
     store64(@@tss, 4, top)
   end
 
-  def self.set_io(serial : Bool)
-    @@tss[104 &+ (0x3f8 >> 3)] = serial ? 0_u8 : 0xff_u8
+  def self.set_io(devices : UInt64)
+    @@tss[104 &+ (0x3f8 >> 3)] = devices & Device::SERIAL != 0 ? 0_u8 : 0xff_u8
+    @@tss[104 &+ (0x60 >> 3)] = devices & Device::KEYBOARD != 0 ? 0xee_u8 : 0xff_u8
   end
 
   def self.init

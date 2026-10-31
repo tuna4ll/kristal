@@ -45,7 +45,7 @@ module Sys
   CALL     = 4_u64
   RECEIVE  = 5_u64
   REPLY    = 6_u64
-  DISPLAY  = 7_u64
+  DEVICE   = 7_u64
   ENDPOINT = 8_u64
   CLOSE    = 9_u64
   FORK     = 10_u64
@@ -53,6 +53,15 @@ module Sys
   MAP      = 12_u64
   UNMAP    = 13_u64
   PID      = 14_u64
+  DROP     = 15_u64
+  IRQ      = 16_u64
+end
+
+module Device
+  DISPLAY  = 1_u64
+  SERIAL   = 2_u64
+  KEYBOARD = 4_u64
+  INITRD   = 8_u64
 end
 
 module Op

@@ -25,7 +25,7 @@ module Display
   end
 
   def self.grant(root : UInt64)
-    return if @@address == 0
+    return if @@address == 0 || Memory.lookup(root, BASE) != 0
     start = @@address & ~4095_u64
     length = ((@@address & 4095) &+ (@@pitch &* @@height) &+ 4095) & ~4095_u64
     offset = 0_u64
@@ -37,8 +37,8 @@ module Display
   end
 
   def self.info(address : UInt64) : Int64
-    return 0_i64 &- Errno::EPERM if Processes.current.value.devices & 1 == 0
     return 0_i64 &- Errno::ENODEV if @@address == 0
+    grant(Processes.root)
     info = uninitialized ABI::Display
     info.address = BASE &+ (@@address & 4095)
     info.width = @@width
