@@ -50,6 +50,8 @@ module Syscalls
       return Devices.request(frame, a, b)
     elsif number == Sys::DROP
       return Devices.drop(frame, a)
+    elsif number == Sys::COPY
+      return IPC.copy(frame, a, b)
     elsif number == Sys::IRQ
       return Devices.bind(frame, a, b)
     else

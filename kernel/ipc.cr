@@ -98,7 +98,7 @@ module IPC
     return 0_i64 &- Errno::EBADF if handle == 0 || handle > SLOTS
     entry = cap(task, handle)
     return 0_i64 &- Errno::EBADF if entry.value.endpoint == 0
-    return 0_i64 &- Errno::EPERM if entry.value.rights & right == 0
+    return 0_i64 &- Errno::EPERM if right != 0 && entry.value.rights & right == 0
     entry.value.endpoint.to_i64!
   end
 
@@ -125,6 +125,16 @@ module IPC
     handle = install(Processes.current, id, ALL)
     return Syscalls.fail(frame, Errno::EMFILE) if handle == 0
     frame[Frame::RAX] = handle
+    frame
+  end
+
+  def self.copy(frame : UInt64*, handle : UInt64, rights : UInt64) : UInt64*
+    task = Processes.current
+    id = resolve(task, handle, 0_u64)
+    return Syscalls.fail(frame, 0_i64 &- id) if id < 0
+    copy = install(task, id.to_u64!, cap(task, handle).value.rights & rights)
+    return Syscalls.fail(frame, Errno::EMFILE) if copy == 0
+    frame[Frame::RAX] = copy
     frame
   end
 
@@ -290,10 +300,6 @@ module IPC
     signal(task, ep.value.pending)
     ep.value.pending = 0_u64
     task.value.state = Processes::READY
-  end
-
-  def self.grant(task : Kernel::Process*, id : UInt64, rights : UInt64) : UInt64
-    install(task, id, rights)
   end
 
   def self.fork(parent : Kernel::Process*, child : Kernel::Process*)

@@ -98,18 +98,13 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   CPU.init
   Memory.init_space
   Console.write("[Kristal] Kernel initialized\n")
-  panic("expected init, console and worker modules") if modules.address == 0 || modules[1] != 3
+  panic("expected init and initrd modules") if modules.address == 0 || modules[1] != 2
   files = Pointer(UInt64).new(modules[2])
   Processes.init
   IPC.init
   Console.write("[Kristal] Loading userspace ELF\n")
-  init = Processes.create(Pointer(UInt64).new(files[0]), "init")
-  console = Processes.create(Pointer(UInt64).new(files[1]), "console", Device::DISPLAY | Device::SERIAL | Device::KEYBOARD)
-  worker = Processes.create(Pointer(UInt64).new(files[2]), "worker")
-  endpoint = IPC.allocate
-  IPC.grant(console, endpoint, IPC::RECEIVE)
-  IPC.grant(init, endpoint, IPC::CALL)
-  IPC.grant(worker, endpoint, IPC::CALL)
+  Devices.initrd(Pointer(UInt64).new(files[1]))
+  Processes.create(Pointer(UInt64).new(files[0]), "init", Device::DISPLAY | Device::SERIAL | Device::KEYBOARD | Device::INITRD)
   Timer.init
   Console.write("[Kristal] PIT timer: 100 Hz\n")
   Console.write("[Kristal] Round-robin: 50 ms quantum\n")

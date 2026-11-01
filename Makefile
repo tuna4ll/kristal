@@ -1,8 +1,13 @@
 SHELL := /bin/sh
 LIMINE_COMMIT := aad3edd370955449717a334f0289dee10e2c5f01
 QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display gtk -vga std -serial stdio -monitor none -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04 -debugcon file:build/kernel.log
+RUNTIME := $(wildcard runtime/*.cr userspace/lib/*.cr) scripts/compile.sh
+SBIN := console
+BIN := worker
+PROGRAMS := $(SBIN) $(BIN)
 
 .PHONY: all run test clean feasibility
+.SECONDEXPANSION:
 all: build/kristal.iso
 
 build:
@@ -21,29 +26,25 @@ build/kernel.elf: build/kernel.o linker/kernel.ld
 	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/kernel.ld build/kernel.o -o $@
 	test -z "$$(nm -u $@)"
 
-build/user.o: userspace/init/main.cr userspace/syscall.cr runtime/base.cr runtime/abi.cr scripts/compile.sh | build
-	scripts/compile.sh userspace/init/main.cr build/user small
+build/%.o: userspace/%/main.cr $$(wildcard userspace/%/*.cr) $(RUNTIME) | build
+	scripts/compile.sh $< build/$* small
 
-build/init.elf: build/user.o linker/user.ld
-	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/user.o -o $@
+build/console.o: kernel/console/font.bin
+
+build/%.elf: build/%.o linker/user.ld
+	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld $(filter %.o,$^) -o $@
 	test -z "$$(nm -u $@)"
 
-build/worker.o: userspace/worker/main.cr userspace/syscall.cr runtime/base.cr runtime/abi.cr scripts/compile.sh | build
-	scripts/compile.sh userspace/worker/main.cr build/worker small
+build/initrd.tar: $(PROGRAMS:%=build/%.elf) $(shell find initrd -type f)
+	rm -rf build/initrd
+	mkdir -p build/initrd/bin build/initrd/sbin
+	cp -R initrd/. build/initrd/
+	for name in $(SBIN); do cp build/$$name.elf build/initrd/sbin/$$name; done
+	for name in $(BIN); do cp build/$$name.elf build/initrd/bin/$$name; done
+	tar --format=ustar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 -cf $@ -C build/initrd .
 
-build/worker.elf: build/worker.o linker/user.ld
-	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/worker.o -o $@
-	test -z "$$(nm -u $@)"
-
-build/console.o: userspace/console/main.cr userspace/syscall.cr runtime/base.cr runtime/abi.cr runtime/screen.cr kernel/console/font.bin scripts/compile.sh | build
-	scripts/compile.sh userspace/console/main.cr build/console small
-
-build/console.elf: build/console.o linker/user.ld
-	ld.lld -nostdlib -static -z max-page-size=4096 -T linker/user.ld build/console.o -o $@
-	test -z "$$(nm -u $@)"
-
-build/kristal.iso: build/console.elf build/worker.elf build/init.elf build/kernel.elf limine.conf vendor/limine/limine scripts/image.sh
-	scripts/image.sh build/kernel.elf build/init.elf build/console.elf build/worker.elf $@ >build/iso.log 2>&1
+build/kristal.iso: build/kernel.elf build/init.elf build/initrd.tar limine.conf vendor/limine/limine scripts/image.sh
+	scripts/image.sh build/kernel.elf build/init.elf build/initrd.tar $@ >build/iso.log 2>&1
 
 run: all
 	$(QEMU) -cdrom build/kristal.iso

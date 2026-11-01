@@ -11,6 +11,26 @@ lib ABI
     e : UInt64
   end
 
+  struct Startup
+    magic : UInt64
+    root : UInt64
+    service : UInt64
+    count : UInt64
+    cwd : UInt64
+  end
+
+  struct Descriptor
+    fd : UInt64
+    handle : UInt64
+    id : UInt64
+    flags : UInt64
+  end
+
+  struct Region
+    address : UInt64
+    length : UInt64
+  end
+
   struct Display
     address : UInt64
     width : UInt64
@@ -55,6 +75,13 @@ module Sys
   PID      = 14_u64
   DROP     = 15_u64
   IRQ      = 16_u64
+  COPY     = 17_u64
+end
+
+module Right
+  CALL    = 1_u64
+  RECEIVE = 2_u64
+  GRANT   = 4_u64
 end
 
 module Device

@@ -1,4 +1,4 @@
-require "../syscall"
+require "../lib/prelude"
 require "../../runtime/screen"
 require "./keyboard"
 
@@ -35,23 +35,25 @@ def input
   end
 end
 
-fun user_main : NoReturn
+def main(argc : UInt64, argv : UInt8**) : Int32
+  service = Posix.service
+  return 1 if service == 0
   display = uninitialized ABI::Display
-  result = User.invoke(Sys::DEVICE, Device::DISPLAY, pointerof(display).address)
+  result = System.device(Device::DISPLAY, pointerof(display).as(UInt8*))
   if result == 0
-    User.exit(1_u64) unless Screen.init(display.address, display.width, display.height, display.pitch, display.red, display.green, display.blue)
+    System.exit(1_u64) unless Screen.init(display.address, display.width, display.height, display.pitch, display.red, display.green, display.blue)
   elsif result != 0_i64 &- Errno::ENODEV
-    User.exit(1_u64)
+    System.exit(1_u64)
   end
-  User.exit(1_u64) if User.invoke(Sys::IRQ, 1_u64, Device::SERIAL) != 0
-  User.exit(1_u64) if User.invoke(Sys::IRQ, 1_u64, Device::KEYBOARD) != 0
+  System.exit(1_u64) if System.invoke(Sys::IRQ, service, Device::SERIAL) != 0
+  System.exit(1_u64) if System.invoke(Sys::IRQ, service, Device::KEYBOARD) != 0
   Arch.port_out(0x3f9_u16, 1_u8)
   message = uninitialized ABI::Message
   buffer = uninitialized UInt8[4096]
   data = pointerof(buffer).as(UInt8*)
   while true
-    sender = User.receive(1_u64, pointerof(message), data, 4096_u64)
-    User.exit(1_u64) if sender < 0
+    sender = System.receive(service, pointerof(message), data, 4096_u64)
+    System.exit(1_u64) if sender < 0
     if sender == 0
       input
       next
@@ -68,6 +70,6 @@ fun user_main : NoReturn
     end
     message.length = 0_u64
     message.cap = 0_u64
-    User.exit(1_u64) if User.reply(1_u64, sender.to_u64!, pointerof(message), data) != 0
+    System.exit(1_u64) if System.reply(service, sender.to_u64!, pointerof(message), data) != 0
   end
 end
