@@ -47,6 +47,13 @@ def main(argc : UInt64, argv : UInt8**) : Int32
     Posix.install(fd, client.to_u64!, 0_u64)
     fd = fd &+ 1
   end
+  files = System.endpoint
+  return 1 if files < 0
+  return 1 if Init.spawn("sbin/fs", files.to_u64!, Device::INITRD) < 0
+  root = System.copy(files.to_u64!, Right::CALL | Right::GRANT)
+  return 1 if root < 0
+  System.close(files.to_u64!)
+  Posix.root = root.to_u64!
   Out.print("Kristal: userspace console online\n")
   Out.print("Hello World from Userspace\n")
   worker = Init.spawn("bin/worker", 0_u64, 0_u64)

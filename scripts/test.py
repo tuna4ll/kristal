@@ -14,6 +14,8 @@ EXPECT = [
     "worker: child exited with 3",
     "worker: mapped memory",
     "worker: stack grew",
+    "Welcome to Kristal.",
+    "worker: found /bin/worker",
     "worker: exiting",
     "init: worker exited normally",
     "[Kristal] init exited, powering off",

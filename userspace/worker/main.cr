@@ -31,6 +31,26 @@ def main(argc : UInt64, argv : UInt8**) : Int32
     Out.print("worker: work completed\n")
     round = round &+ 1
   end
+  fd = Posix.open("/etc/../etc/motd".to_unsafe, 0_u64)
+  return 1 if fd < 0
+  text = uninitialized UInt8[128]
+  count = Posix.read(fd.to_u64!, pointerof(text).as(UInt8*), 128_u64)
+  return 1 if count <= 0
+  Out.write(1_u64, pointerof(text).as(UInt8*), count.to_u64!)
+  Posix.close(fd.to_u64!)
+  directory = Posix.open("/bin".to_unsafe, Flag::DIRECTORY)
+  return 1 if directory < 0
+  entries = uninitialized UInt8[512]
+  size = Posix.getdents(directory.to_u64!, pointerof(entries).as(UInt8*), 512_u64)
+  return 1 if size <= 0
+  offset = 0_i64
+  while offset < size
+    record = pointerof(entries).as(UInt8*) + offset
+    Out.print("worker: found /bin/")
+    Out.print(record + 19_i64)
+    Out.print("\n")
+    offset = offset &+ (record + 16_i64).as(UInt16*).value.to_i64!
+  end
   Out.print("worker: exiting\n")
   0
 end

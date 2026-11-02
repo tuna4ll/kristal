@@ -26,6 +26,28 @@ lib ABI
     flags : UInt64
   end
 
+  # same layout as struct stat on linux x86_64
+  struct Stat
+    dev : UInt64
+    ino : UInt64
+    nlink : UInt64
+    mode : UInt32
+    uid : UInt32
+    gid : UInt32
+    pad : UInt32
+    rdev : UInt64
+    size : Int64
+    blksize : Int64
+    blocks : Int64
+    atime : Int64
+    atime_nsec : Int64
+    mtime : Int64
+    mtime_nsec : Int64
+    ctime : Int64
+    ctime_nsec : Int64
+    reserved : Int64[3]
+  end
+
   struct Region
     address : UInt64
     length : UInt64
@@ -41,6 +63,22 @@ lib ABI
     blue : UInt64
     length : UInt64
   end
+end
+
+module Mode
+  TYPE      = 0o170000_u32
+  DIRECTORY = 0o040000_u32
+  REGULAR   = 0o100000_u32
+  CHARACTER = 0o020000_u32
+end
+
+module Flag
+  ACCESS    =       3_u64
+  WRITE     =       1_u64
+  CREATE    =    0x40_u64
+  TRUNCATE  =   0x200_u64
+  DIRECTORY = 0x10000_u64
+  CLOEXEC   = 0x80000_u64
 end
 
 module Aux
@@ -59,15 +97,15 @@ module Wait
 end
 
 module Sys
-  EXIT     = 1_u64
-  SLEEP    = 2_u64
-  WAIT     = 3_u64
-  CALL     = 4_u64
-  RECEIVE  = 5_u64
-  REPLY    = 6_u64
-  DEVICE   = 7_u64
-  ENDPOINT = 8_u64
-  CLOSE    = 9_u64
+  EXIT     =  1_u64
+  SLEEP    =  2_u64
+  WAIT     =  3_u64
+  CALL     =  4_u64
+  RECEIVE  =  5_u64
+  REPLY    =  6_u64
+  DEVICE   =  7_u64
+  ENDPOINT =  8_u64
+  CLOSE    =  9_u64
   FORK     = 10_u64
   EXEC     = 11_u64
   MAP      = 12_u64
@@ -106,38 +144,41 @@ end
 
 # linux numbering, so a future libc can pass these through unchanged
 module Errno
-  EPERM   =  1_i64
-  ENOENT  =  2_i64
-  ESRCH   =  3_i64
-  E2BIG   =  7_i64
-  ENOEXEC =  8_i64
-  EBADF   =  9_i64
-  ECHILD  = 10_i64
-  EAGAIN  = 11_i64
-  ENOMEM  = 12_i64
-  EFAULT  = 14_i64
-  EBUSY   = 16_i64
-  EEXIST  = 17_i64
-  ENODEV  = 19_i64
-  ENOTDIR = 20_i64
-  EISDIR  = 21_i64
-  EINVAL  = 22_i64
-  EMFILE  = 24_i64
-  ENOTTY  = 25_i64
-  ENOSPC  = 28_i64
-  ESPIPE  = 29_i64
-  EPIPE   = 32_i64
-  EDEADLK = 35_i64
-  ENOSYS  = 38_i64
+  EPERM        =  1_i64
+  ENOENT       =  2_i64
+  ESRCH        =  3_i64
+  E2BIG        =  7_i64
+  ENOEXEC      =  8_i64
+  EBADF        =  9_i64
+  ECHILD       = 10_i64
+  EAGAIN       = 11_i64
+  ENOMEM       = 12_i64
+  EFAULT       = 14_i64
+  EBUSY        = 16_i64
+  EEXIST       = 17_i64
+  ENODEV       = 19_i64
+  ENOTDIR      = 20_i64
+  EISDIR       = 21_i64
+  EINVAL       = 22_i64
+  EMFILE       = 24_i64
+  ENOTTY       = 25_i64
+  ENOSPC       = 28_i64
+  ESPIPE       = 29_i64
+  EROFS        = 30_i64
+  EPIPE        = 32_i64
+  ERANGE       = 34_i64
+  EDEADLK      = 35_i64
+  ENAMETOOLONG = 36_i64
+  ENOSYS       = 38_i64
 end
 
 module Layout
-  IMAGE     =          0x10000_u64
-  IMAGE_END =       0x40000000_u64
-  MAP       =     0x1000000000_u64
-  DEVICE    =   0x700000000000_u64
-  INITRD    =   0x710000000000_u64
-  STACK     =   0x7fffffff0000_u64
-  STACK_MAX =        0x800000_u64
-  END       =   0x800000000000_u64
+  IMAGE     =        0x10000_u64
+  IMAGE_END =     0x40000000_u64
+  MAP       =   0x1000000000_u64
+  DEVICE    = 0x700000000000_u64
+  INITRD    = 0x710000000000_u64
+  STACK     = 0x7fffffff0000_u64
+  STACK_MAX =       0x800000_u64
+  END       = 0x800000000000_u64
 end
