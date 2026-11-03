@@ -34,11 +34,16 @@ fun user_start(stack : UInt64*) : NoReturn
   aux += 1_i64
   data = 0_u64
   size = 0_u64
+  phdr = 0_u64
+  count = 0_u64
   while aux[0] != 0
     data = aux[1] if aux[0] == Aux::DATA
     size = aux[1] if aux[0] == Aux::SIZE
+    phdr = aux[1] if aux[0] == Aux::PHDR
+    count = aux[1] if aux[0] == Aux::PHNUM
     aux += 2_i64
   end
+  Posix.image(phdr, count)
   Start.environ = Pointer(UInt8*).new(envp.address)
   Posix.init(Pointer(UInt8).new(data), size)
   Posix.exit(main(argc, argv).to_u64! & 255)

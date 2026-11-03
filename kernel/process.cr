@@ -23,6 +23,7 @@ lib Kernel
     collected : UInt64
     wait_pid : UInt64
     wait_buffer : UInt64
+    fs_base : UInt64
   end
 end
 
@@ -138,6 +139,7 @@ module Processes
     child.value.frame = copy
     child.value.root = Memory.clone_space(parent.value.root)
     child.value.devices = parent.value.devices
+    child.value.fs_base = parent.value.fs_base
     child.value.parent = parent.value.pid
     IPC.fork(parent, child)
     child.value.state = READY
@@ -159,6 +161,8 @@ module Processes
     task.value.root = root
     Arch.write_cr3(root)
     Memory.destroy_space(old)
+    task.value.fs_base = 0_u64
+    Arch.write_fs_base(0_u64)
     memset(frame.as(UInt8*), 0, Frame::WORDS.to_u64! &* 8)
     frame[Frame::RIP] = entry.to_u64!
     frame[Frame::CS] = 0x23_u64
@@ -222,6 +226,7 @@ module Processes
     CPU.set_stack(task.value.stack)
     CPU.set_io(task.value.devices)
     Arch.write_cr3(task.value.root)
+    Arch.write_fs_base(task.value.fs_base)
     task.value.frame
   end
 
@@ -276,7 +281,16 @@ module Processes
     task.value.state = FREE if task.value.state == DEAD
   end
 
-  def self.wait(frame : UInt64*, pid : UInt64, address : UInt64) : UInt64*
+  # the thread pointer a libc keeps its tls block behind
+  def self.thread(frame : UInt64*, base : UInt64) : UInt64*
+    return Syscalls.fail(frame, Errno::EINVAL) if base >= Layout::END
+    @@current.value.fs_base = base
+    Arch.write_fs_base(base)
+    frame[Frame::RAX] = 0_u64
+    frame
+  end
+
+  def self.wait(frame : UInt64*, pid : UInt64, address : UInt64, options : UInt64) : UInt64*
     return Syscalls.fail(frame, Errno::EFAULT) unless address == 0 || Memory.access(root, address, 8_u64, true)
     parent = @@current.value.pid
     found = false
@@ -296,6 +310,10 @@ module Processes
       i = i &+ 1
     end
     return Syscalls.fail(frame, Errno::ECHILD) unless found
+    if options & Wait::NOHANG != 0
+      frame[Frame::RAX] = 0_u64
+      return frame
+    end
     @@current.value.wait_pid = pid
     @@current.value.wait_buffer = address
     block(frame, WAITING)

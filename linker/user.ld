@@ -1,11 +1,12 @@
 ENTRY(_user_start)
 PHDRS {
-  text PT_LOAD FLAGS(5);
+  headers PT_PHDR PHDRS;
+  text PT_LOAD FILEHDR PHDRS FLAGS(5);
   rodata PT_LOAD FLAGS(4);
   data PT_LOAD FLAGS(6);
 }
 SECTIONS {
-  . = 0x400000;
+  . = 0x400000 + SIZEOF_HEADERS;
   .text : { *(.text .text.*) } :text
   . = ALIGN(4096);
   .rodata : { *(.rodata .rodata.*) } :rodata

@@ -43,8 +43,12 @@ module System
     invoke(Sys::EXEC, image.address, length, argv.address, envp.address, data.address, size)
   end
 
-  def self.wait(pid : UInt64, status : UInt64*) : Int64
-    invoke(Sys::WAIT, pid, status.address)
+  def self.wait(pid : UInt64, status : UInt64*, options : UInt64 = 0_u64) : Int64
+    invoke(Sys::WAIT, pid, status.address, options)
+  end
+
+  def self.pid(parent : Bool = false) : Int64
+    invoke(Sys::PID, parent ? 1_u64 : 0_u64)
   end
 
   def self.map(address : UInt64, length : UInt64, flags : UInt64) : Int64

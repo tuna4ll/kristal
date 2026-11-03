@@ -24,7 +24,7 @@ module Syscalls
     elsif number == Sys::SLEEP
       return Processes.sleep(frame, a)
     elsif number == Sys::WAIT
-      return Processes.wait(frame, a, b)
+      return Processes.wait(frame, a, b, c)
     elsif number == Sys::CALL
       return IPC.call(frame, a, b, c, d)
     elsif number == Sys::RECEIVE
@@ -50,6 +50,8 @@ module Syscalls
       return Devices.request(frame, a, b)
     elsif number == Sys::DROP
       return Devices.drop(frame, a)
+    elsif number == Sys::THREAD
+      return Processes.thread(frame, a)
     elsif number == Sys::COPY
       return IPC.copy(frame, a, b)
     elsif number == Sys::IRQ

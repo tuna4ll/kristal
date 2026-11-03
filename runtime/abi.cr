@@ -93,7 +93,8 @@ module Aux
 end
 
 module Wait
-  ANY = 0xffffffffffffffff_u64
+  ANY    = 0xffffffffffffffff_u64
+  NOHANG =                  1_u64
 end
 
 module Sys
@@ -114,6 +115,7 @@ module Sys
   DROP     = 15_u64
   IRQ      = 16_u64
   COPY     = 17_u64
+  THREAD   = 18_u64
 end
 
 module Right
@@ -147,12 +149,14 @@ module Errno
   EPERM        =  1_i64
   ENOENT       =  2_i64
   ESRCH        =  3_i64
+  EIO          =  5_i64
   E2BIG        =  7_i64
   ENOEXEC      =  8_i64
   EBADF        =  9_i64
   ECHILD       = 10_i64
   EAGAIN       = 11_i64
   ENOMEM       = 12_i64
+  EACCES       = 13_i64
   EFAULT       = 14_i64
   EBUSY        = 16_i64
   EEXIST       = 17_i64

@@ -71,6 +71,10 @@ module Arch
     Pointer(UInt8).new(value)
   end
 
+  def self.write_fs_base(value : UInt64)
+    asm("wrmsr" :: "{ecx}"(0xc0000100_u32), "{eax}"(value.to_u32!), "{edx}"((value >> 32).to_u32!) :: "volatile")
+  end
+
   # every stub in entry.cr is padded to 16 bytes
   def self.interrupt_address(index : UInt64) : UInt64
     value = 0_u64
