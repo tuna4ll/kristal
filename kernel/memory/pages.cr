@@ -175,8 +175,8 @@ module Memory
   end
 
   def self.access(root : UInt64, address : UInt64, length : UInt64, write : Bool) : Bool
-    return false if address < Layout::IMAGE || address >= Layout::END || length > Layout::END &- address
     return true if length == 0
+    return false if address < Layout::IMAGE || address >= Layout::END || length > Layout::END &- address
     page = address & ~4095_u64
     last = (address &+ length &- 1) & ~4095_u64
     while page <= last
