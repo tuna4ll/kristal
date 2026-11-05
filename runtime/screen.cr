@@ -49,6 +49,14 @@ module Screen
     true
   end
 
+  def self.rows : UInt64
+    @@rows
+  end
+
+  def self.columns : UInt64
+    @@columns
+  end
+
   def self.cells : UInt8*
     pointerof(@@cells).as(UInt8*)
   end

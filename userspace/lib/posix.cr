@@ -414,7 +414,7 @@ module Posix
 
   def self.ioctl(fd : UInt64, request : UInt64, argument : UInt8*) : Int64
     size = 0_u64
-    size = 60_u64 if request >= 0x5401 && request <= 0x5404
+    size = 36_u64 if request >= 0x5401 && request <= 0x5404
     size = 8_u64 if request == 0x5413 || request == 0x5414
     size = 4_u64 if request == 0x540f || request == 0x5410
     message = uninitialized ABI::Message
