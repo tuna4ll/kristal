@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import subprocess
 import sys
+import threading
+import time
 
 QEMU = [
     "qemu-system-x86_64", "-machine", "q35", "-cpu", "qemu64,+nx", "-m", "128M",
@@ -9,41 +11,92 @@ QEMU = [
     "-cdrom", "build/kristal.iso",
 ]
 
-EXPECT = [
-    "Hello World from Userspace",
-    "worker: child exited with 3",
-    "worker: mapped memory",
-    "worker: stack grew",
-    "Welcome to Kristal.",
-    "worker: found /bin/worker",
-    "worker: running after execve",
-    "worker: execve child exited with 5",
-    "worker: brk grew",
-    "worker: exiting",
-    "init: worker exited normally",
-    "[Kristal] init exited, powering off",
+PROMPT = "$ "
+
+# each command is typed into the shell and must print the expected text before the next prompt
+STEPS = [
+    ("echo hello kristal", "hello kristal"),
+    ("cat /etc/motd", "Welcome to Kristal."),
+    ("ls /bin", "selftest"),
+    ("ls -l /dev", "crw--w---- 0 console"),
+    ("cd /etc", ""),
+    ("pwd", "/etc"),
+    ("cat < motd", "Welcome to Kristal."),
+    ("cd ..", ""),
+    ("uname -a", "Kristal kristal 0.1 microkernel x86_64"),
+    ("echo $HOME '$HOME' \"$PATH\"", "/ $HOME /bin:/sbin"),
+    ("nosuch", "sh: nosuch: not found"),
+    ("echo $?", "127"),
+    ("selftest", "selftest: exiting"),
+    ("echo $?", "0"),
 ]
 
 
+class Machine:
+    def __init__(self):
+        self.process = subprocess.Popen(QEMU, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.output = ""
+        self.cursor = 0
+        self.lock = threading.Lock()
+        threading.Thread(target=self.pump, daemon=True).start()
+
+    def pump(self):
+        while True:
+            chunk = self.process.stdout.read1(4096)
+            if not chunk:
+                return
+            with self.lock:
+                self.output += chunk.decode(errors="replace").replace("\r", "")
+
+    def expect(self, text, timeout=20):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self.lock:
+                found = self.output.find(text, self.cursor)
+                if found >= 0:
+                    self.cursor = found + len(text)
+                    return True
+            time.sleep(0.02)
+        return False
+
+    def send(self, line):
+        self.process.stdin.write(line.encode() + b"\r")
+        self.process.stdin.flush()
+
+
 def main():
+    machine = Machine()
+    failures = []
+    if not machine.expect(PROMPT, 30):
+        failures.append("no shell prompt")
+    else:
+        for command, expected in STEPS:
+            machine.send(command)
+            if not machine.expect(command):
+                failures.append(f"{command!r} was not echoed")
+                break
+            if expected and not machine.expect(expected):
+                failures.append(f"{command!r} did not print {expected!r}")
+            if not machine.expect(PROMPT):
+                failures.append(f"no prompt after {command!r}")
+                break
+        machine.send("exit 0")
     try:
-        run = subprocess.run(QEMU, stdin=subprocess.DEVNULL, capture_output=True, timeout=30)
-    except subprocess.TimeoutExpired as error:
-        sys.stdout.write((error.stdout or b"").decode(errors="replace"))
-        print("test: timed out")
-        return 1
-    output = run.stdout.decode(errors="replace")
+        code = machine.process.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        machine.process.kill()
+        code = None
+        failures.append("did not power off")
+    time.sleep(0.1)
+    sys.stdout.write(machine.output)
     with open("build/kernel.log", errors="replace") as log:
-        output += log.read()
-    sys.stdout.write(output)
-    missing = [line for line in EXPECT if line not in output]
-    for line in missing:
-        print(f"test: missing {line!r}")
+        sys.stdout.write(log.read())
     # isa-debug-exit turns 0x10 into (0x10 << 1) | 1
-    if run.returncode != 33:
-        print(f"test: qemu exited with {run.returncode}")
-        return 1
-    return 1 if missing else 0
+    if code is not None and code != 33:
+        failures.append(f"qemu exited with {code}")
+    for failure in failures:
+        print(f"test: {failure}")
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

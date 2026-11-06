@@ -10,29 +10,29 @@ end
 
 def main(argc : UInt64, argv : UInt8**) : Int32
   if argc > 1 && Text.equal?(argv[1], "exec")
-    Out.print("worker: running after execve\n")
+    Out.print("selftest: running after execve\n")
     return 5
   end
-  Out.print("worker: connected through IPC\n")
+  Out.print("selftest: connected through IPC\n")
   child = System.fork
   return 1 if child < 0
   if child == 0
-    Out.print("worker: child running\n")
+    Out.print("selftest: child running\n")
     return 3
   end
   status = 0_u64
   return 1 if System.wait(child.to_u64!, pointerof(status)) != child || status != 3_u64 << 8
-  Out.print("worker: child exited with 3\n")
+  Out.print("selftest: child exited with 3\n")
   return 1 if System.map(Layout::MAP, 8192_u64, 1_u64) != 0
   Pointer(UInt64).new(Layout::MAP &+ 4096).value = 42_u64
   return 1 if System.unmap(Layout::MAP, 8192_u64) != 0
-  Out.print("worker: mapped memory\n")
+  Out.print("selftest: mapped memory\n")
   return 1 if deep(200_u64) == 0
-  Out.print("worker: stack grew\n")
+  Out.print("selftest: stack grew\n")
   round = 0_u64
   while round < 2
     System.sleep(20_u64)
-    Out.print("worker: work completed\n")
+    Out.print("selftest: work completed\n")
     round = round &+ 1
   end
   fd = Posix.open("/etc/../etc/motd".to_unsafe, 0_u64)
@@ -50,7 +50,7 @@ def main(argc : UInt64, argv : UInt8**) : Int32
   offset = 0_i64
   while offset < size
     record = pointerof(entries).as(UInt8*) + offset
-    Out.print("worker: found /bin/")
+    Out.print("selftest: found /bin/")
     Out.print(record + 19_i64)
     Out.print("\n")
     offset = offset &+ (record + 16_i64).as(UInt16*).value.to_i64!
@@ -59,19 +59,19 @@ def main(argc : UInt64, argv : UInt8**) : Int32
   if child == 0
     args = uninitialized UInt8*[3]
     list = pointerof(args).as(UInt8**)
-    list[0] = "worker".to_unsafe
+    list[0] = "selftest".to_unsafe
     list[1] = "exec".to_unsafe
     list[2] = Pointer(UInt8).new(0_u64)
-    Posix.execve("/bin/worker".to_unsafe, list, list + 2_i64)
+    Posix.execve("/bin/selftest".to_unsafe, list, list + 2_i64)
     return 9
   end
   code = 0_i32
   return 1 if Posix.waitpid(child, pointerof(code), 0_u64) != child || code != 5 << 8
-  Out.print("worker: execve child exited with 5\n")
+  Out.print("selftest: execve child exited with 5\n")
   base = Posix.brk(0_u64)
   return 1 if base <= 0 || Posix.brk(base.to_u64! &+ 10000) != base &+ 10000
   Pointer(UInt8).new(base.to_u64! &+ 9999).value = 1_u8
-  Out.print("worker: brk grew\n")
-  Out.print("worker: exiting\n")
+  Out.print("selftest: brk grew\n")
+  Out.print("selftest: exiting\n")
   0
 end

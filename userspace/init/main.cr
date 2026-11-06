@@ -55,20 +55,25 @@ def main(argc : UInt64, argv : UInt8**) : Int32
   System.close(files.to_u64!)
   Posix.root = root.to_u64!
   Out.print("Kristal: userspace console online\n")
-  Out.print("Hello World from Userspace\n")
-  worker = Init.spawn("bin/worker", 0_u64, 0_u64)
-  return 1 if worker < 0
-  Out.print("init: waiting for worker\n")
+  shell = Posix.fork
+  if shell == 0
+    words = uninitialized UInt8*[5]
+    list = pointerof(words).as(UInt8**)
+    list[0] = "sh".to_unsafe
+    list[1] = Pointer(UInt8).new(0_u64)
+    list[2] = "PATH=/bin:/sbin".to_unsafe
+    list[3] = "HOME=/".to_unsafe
+    list[4] = Pointer(UInt8).new(0_u64)
+    Posix.execve("/bin/sh".to_unsafe, list, list + 2_i64)
+    return 127
+  end
+  return 1 if shell < 0
   status = 0_u64
   while true
     pid = System.wait(Wait::ANY, pointerof(status))
     return 1 if pid < 0
-    break if pid == worker
+    break if pid == shell
   end
-  if status == 0
-    Out.print("init: worker exited normally\n")
-  else
-    Out.print("init: worker failed; kernel is still running\n")
-  end
-  status == 0 ? 0 : 1
+  Out.print("init: shell exited, shutting down\n")
+  ((status >> 8) & 255).to_i32!
 end
