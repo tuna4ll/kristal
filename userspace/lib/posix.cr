@@ -52,9 +52,22 @@ module Posix
     @@service = startup.value.service
     entries = (data + sizeof(ABI::Startup)).as(ABI::Descriptor*)
     i = 0_u64
-    while i < startup.value.count && i < FDS
+    while i < startup.value.count
       entry = entries + i.to_i64!
-      install(entry.value.fd, entry.value.handle, entry.value.id) if entry.value.fd < FDS
+      install(entry.value.fd, entry.value.handle, entry.value.id) if entry.value.flags & CLOEXEC == 0 && entry.value.fd < FDS
+      i = i &+ 1
+    end
+    # close on exec descriptors come along only so the new image can release them
+    i = 0_u64
+    while i < startup.value.count
+      entry = entries + i.to_i64!
+      if entry.value.flags & CLOEXEC != 0
+        message = uninitialized ABI::Message
+        clear(pointerof(message), Op::CLOSE)
+        message.a = entry.value.id
+        System.call(entry.value.handle, pointerof(message), Pointer(UInt8).new(0_u64), 0_u64)
+        System.close(entry.value.handle) unless shared?(entry.value.handle, FDS)
+      end
       i = i &+ 1
     end
     path = (entries + startup.value.count.to_i64!).as(UInt8*)
@@ -64,7 +77,7 @@ module Posix
     end
   end
 
-  # serializes the state a new image inherits, close on exec descriptors stay behind
+  # serializes the state a new image inherits
   def self.startup(buffer : UInt8*, service : UInt64) : UInt64
     startup = buffer.as(ABI::Startup*)
     startup.value.magic = MAGIC
@@ -74,12 +87,12 @@ module Posix
     count = 0_u64
     fd = 0_u64
     while fd < FDS
-      if flags[fd] & OPEN != 0 && flags[fd] & CLOEXEC == 0
+      if flags[fd] & OPEN != 0
         entry = entries + count.to_i64!
         entry.value.fd = fd
         entry.value.handle = handles[fd]
         entry.value.id = ids[fd]
-        entry.value.flags = 0_u64
+        entry.value.flags = flags[fd] & CLOEXEC
         count = count &+ 1
       end
       fd = fd &+ 1

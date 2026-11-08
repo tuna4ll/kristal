@@ -11,6 +11,7 @@ end
 def main(argc : UInt64, argv : UInt8**) : Int32
   if argc > 1 && Text.equal?(argv[1], "exec")
     Out.print("selftest: running after execve\n")
+    return 6 if Posix.valid?(3_u64)
     return 5
   end
   Out.print("selftest: connected through IPC\n")
@@ -55,6 +56,9 @@ def main(argc : UInt64, argv : UInt8**) : Int32
     Out.print("\n")
     offset = offset &+ (record + 16_i64).as(UInt16*).value.to_i64!
   end
+  Posix.close(directory.to_u64!)
+  kept = Posix.open("/etc/motd".to_unsafe, Flag::CLOEXEC)
+  return 1 if kept != 3
   child = Posix.fork
   if child == 0
     args = uninitialized UInt8*[3]
@@ -68,6 +72,7 @@ def main(argc : UInt64, argv : UInt8**) : Int32
   code = 0_i32
   return 1 if Posix.waitpid(child, pointerof(code), 0_u64) != child || code != 5 << 8
   Out.print("selftest: execve child exited with 5\n")
+  Posix.close(kept.to_u64!)
   base = Posix.brk(0_u64)
   return 1 if base <= 0 || Posix.brk(base.to_u64! &+ 10000) != base &+ 10000
   Pointer(UInt8).new(base.to_u64! &+ 9999).value = 1_u8
