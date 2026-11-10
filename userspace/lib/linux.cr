@@ -28,6 +28,8 @@ module Linux
       Posix.brk(a)
     elsif number == 16
       Posix.ioctl(a, b, path(c))
+    elsif number == 22
+      Posix.pipe(Pointer(Int32).new(a), 0_u64)
     elsif number == 32
       Posix.dup(a)
     elsif number == 33
@@ -58,6 +60,8 @@ module Linux
       System.invoke(Sys::THREAD, b)
     elsif number == 217
       Posix.getdents(a, path(b), c)
+    elsif number == 293
+      Posix.pipe(Pointer(Int32).new(a), b)
     elsif number == 257 && a.to_i64! == -100
       Posix.open(path(b), c)
     else

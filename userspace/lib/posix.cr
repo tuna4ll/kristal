@@ -217,6 +217,30 @@ module Posix
     fd
   end
 
+  def self.pipe(fds : Int32*, mode : UInt64) : Int64
+    return error(Errno::ENFILE) if @@root == 0
+    message = uninitialized ABI::Message
+    clear(pointerof(message), Op::PIPE)
+    result = System.call(@@root, pointerof(message), Pointer(UInt8).new(0_u64), 0_u64)
+    result = message.tag.to_i64! if result == 0
+    return result if result < 0
+    reader = lowest
+    install(reader.to_u64!, @@root, message.a) if reader >= 0
+    writer = lowest
+    if reader < 0 || writer < 0
+      close(reader.to_u64!) if reader >= 0
+      return error(Errno::EMFILE)
+    end
+    install(writer.to_u64!, @@root, message.b)
+    if mode & Flag::CLOEXEC != 0
+      flags[reader] = flags[reader] | CLOEXEC
+      flags[writer] = flags[writer] | CLOEXEC
+    end
+    fds[0] = reader.to_i32!
+    fds[1] = writer.to_i32!
+    0_i64
+  end
+
   def self.read(fd : UInt64, buffer : UInt8*, count : UInt64) : Int64
     message = uninitialized ABI::Message
     clear(pointerof(message), Op::READ)
@@ -457,7 +481,13 @@ module Posix
     0_i64
   end
 
+  # servers count references, so everything still open is given back first
   def self.exit(status : UInt64) : NoReturn
+    fd = 0_u64
+    while fd < FDS
+      close(fd) if valid?(fd)
+      fd = fd &+ 1
+    end
     System.exit(status)
   end
 end

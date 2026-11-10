@@ -70,6 +70,7 @@ module Mode
   DIRECTORY = 0o040000_u32
   REGULAR   = 0o100000_u32
   CHARACTER = 0o020000_u32
+  FIFO      = 0o010000_u32
 end
 
 module Flag
@@ -142,6 +143,7 @@ module Op
   GETDENTS =  8_u64
   SEEK     =  9_u64
   IOCTL    = 10_u64
+  PIPE     = 11_u64
 end
 
 # linux numbering, so a future libc can pass these through unchanged
@@ -164,6 +166,7 @@ module Errno
   ENOTDIR      = 20_i64
   EISDIR       = 21_i64
   EINVAL       = 22_i64
+  ENFILE       = 23_i64
   EMFILE       = 24_i64
   ENOTTY       = 25_i64
   ENOSPC       = 28_i64

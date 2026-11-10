@@ -1,5 +1,6 @@
 require "../lib/prelude"
 require "../lib/tar"
+require "./pipe"
 
 lib FS
   struct Node
@@ -14,6 +15,8 @@ lib FS
     node : UInt64
     offset : UInt64
     refs : UInt64
+    pipe : UInt64
+    side : UInt64
   end
 end
 
@@ -118,6 +121,8 @@ module Tree
         file.value.node = node
         file.value.offset = 0_u64
         file.value.refs = 1_u64
+        file.value.pipe = 0_u64
+        file.value.side = 0_u64
         return i
       end
       i = i &+ 1
@@ -184,42 +189,70 @@ def fail(message : ABI::Message*, error : Int64)
   message.value.tag = (0_i64 &- error).to_u64!
 end
 
-def serve(message : ABI::Message*, data : UInt8*, capacity : UInt64)
+# returns false when the answer has to wait for a pipe
+def serve(sender : UInt64, message : ABI::Message*, data : UInt8*, capacity : UInt64) : Bool
   op = message.value.tag
   request = message.value.length
   message.value.length = 0_u64
   message.value.cap = 0_u64
   message.value.tag = 0_u64
+  if op == Op::PIPE
+    Pipes.create(message)
+    return true
+  end
   if op == Op::OPEN || op == Op::STAT
-    return fail(message, Errno::ENAMETOOLONG) if request == 0 || request >= capacity
+    return Pipes.fail_now(message, Errno::ENAMETOOLONG) if request == 0 || request >= capacity
     data[request] = 0_u8
     index = Tree.lookup(data)
-    return fail(message, Errno::ENOENT) if index == Tree::NODES
+    return Pipes.fail_now(message, Errno::ENOENT) if index == Tree::NODES
     if op == Op::STAT
       Tree.stat(index, data)
       message.value.length = sizeof(ABI::Stat).to_u64!
-      return
+      return true
     end
     flags = message.value.a
-    return fail(message, Errno::ENOTDIR) if flags & Flag::DIRECTORY != 0 && !Tree.directory?(index)
+    return Pipes.fail_now(message, Errno::ENOTDIR) if flags & Flag::DIRECTORY != 0 && !Tree.directory?(index)
     if index == Tree.console
       # the caller talks to the console service directly from now on
       message.value.cap = Posix.handles[1]
       message.value.b = 1_u64
-      return
+      return true
     end
-    return fail(message, Errno::EISDIR) if flags & Flag::ACCESS != 0 && Tree.directory?(index)
-    return fail(message, Errno::EROFS) if flags & (Flag::ACCESS | Flag::CREATE | Flag::TRUNCATE) != 0
+    return Pipes.fail_now(message, Errno::EISDIR) if flags & Flag::ACCESS != 0 && Tree.directory?(index)
+    return Pipes.fail_now(message, Errno::EROFS) if flags & (Flag::ACCESS | Flag::CREATE | Flag::TRUNCATE) != 0
     id = Tree.open(index)
-    return fail(message, Errno::EMFILE) if id == 0
+    return Pipes.fail_now(message, Errno::EMFILE) if id == 0
     message.value.tag = id
-    return
+    return true
   end
-  file = Tree.file(message.value.a)
-  return fail(message, Errno::EBADF) if file.address == 0
+  id = message.value.a
+  file = Tree.file(id)
+  return Pipes.fail_now(message, Errno::EBADF) if file.address == 0
   node = Tree.nodes + file.value.node.to_i64!
+  if file.value.pipe != 0
+    if op == Op::READ
+      return Pipes.read(sender, file, id, message, data, capacity)
+    elsif op == Op::WRITE
+      return Pipes.write(sender, file, id, message, data, request)
+    elsif op == Op::CLOSE
+      file.value.refs = file.value.refs &- 1
+      Pipes.release(file)
+    elsif op == Op::DUP
+      file.value.refs = file.value.refs &+ 1
+    elsif op == Op::FSTAT
+      memset(data, 0, sizeof(ABI::Stat).to_u64!)
+      data.as(ABI::Stat*).value.mode = Mode::FIFO | 0o600_u32
+      data.as(ABI::Stat*).value.nlink = 1_u64
+      message.value.length = sizeof(ABI::Stat).to_u64!
+    elsif op == Op::SEEK
+      fail(message, Errno::ESPIPE)
+    else
+      fail(message, Errno::ENOTTY)
+    end
+    return true
+  end
   if op == Op::READ
-    return fail(message, Errno::EISDIR) if Tree.directory?(file.value.node)
+    return Pipes.fail_now(message, Errno::EISDIR) if Tree.directory?(file.value.node)
     count = message.value.b
     count = capacity if count > capacity
     left = node.value.size > file.value.offset ? node.value.size &- file.value.offset : 0_u64
@@ -238,22 +271,23 @@ def serve(message : ABI::Message*, data : UInt8*, capacity : UInt64)
     Tree.stat(file.value.node, data)
     message.value.length = sizeof(ABI::Stat).to_u64!
   elsif op == Op::GETDENTS
-    return fail(message, Errno::ENOTDIR) unless Tree.directory?(file.value.node)
+    return Pipes.fail_now(message, Errno::ENOTDIR) unless Tree.directory?(file.value.node)
     count = message.value.b
     count = capacity if count > capacity
     message.value.length = Tree.entries(file, data, count)
     message.value.tag = message.value.length
   elsif op == Op::SEEK
-    return fail(message, Errno::ESPIPE) if Tree.directory?(file.value.node) && message.value.b != 0
+    return Pipes.fail_now(message, Errno::ESPIPE) if Tree.directory?(file.value.node) && message.value.b != 0
     base = message.value.c == 0 ? 0_i64 : (message.value.c == 1 ? file.value.offset.to_i64! : node.value.size.to_i64!)
-    return fail(message, Errno::EINVAL) if message.value.c > 2
+    return Pipes.fail_now(message, Errno::EINVAL) if message.value.c > 2
     position = base &+ message.value.b.to_i64!
-    return fail(message, Errno::EINVAL) if position < 0
+    return Pipes.fail_now(message, Errno::EINVAL) if position < 0
     file.value.offset = position.to_u64!
     message.value.tag = file.value.offset
   else
     fail(message, Errno::ENOTTY)
   end
+  true
 end
 
 def main(argc : UInt64, argv : UInt8**) : Int32
@@ -268,9 +302,10 @@ def main(argc : UInt64, argv : UInt8**) : Int32
   data = pointerof(buffer).as(UInt8*)
   while true
     sender = System.receive(service, pointerof(message), data, 4096_u64)
-    return 1 if sender < 0
-    next if sender == 0
-    serve(pointerof(message), data, 4096_u64)
-    System.reply(service, sender.to_u64!, pointerof(message), data)
+    next if sender <= 0
+    if serve(sender.to_u64!, pointerof(message), data, 4096_u64)
+      System.reply(service, sender.to_u64!, pointerof(message), data)
+    end
+    Pipes.flush(service, pointerof(message), data)
   end
 end
