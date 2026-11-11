@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import subprocess
 import sys
 import threading
@@ -25,6 +26,10 @@ STEPS = [
     ("cd ..", ""),
     ("uname -a", "Kristal kristal 0.1 microkernel x86_64"),
     ("echo $HOME '$HOME' \"$PATH\"", "/ $HOME /bin:/sbin"),
+    ("ls /bin | cat | wc -l", "7"),
+    ("echo one two|cat|cat", "one two"),
+    ("cat /bin/sh | cat | wc -c", str(os.path.getsize("build/initrd/bin/sh"))),
+    ("cat < /etc/motd | wc -w", "3"),
     ("nosuch", "sh: nosuch: not found"),
     ("echo $?", "127"),
     ("selftest", "selftest: exiting"),
