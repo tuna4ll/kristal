@@ -117,6 +117,8 @@ module Sys
   IRQ      = 16_u64
   COPY     = 17_u64
   THREAD   = 18_u64
+  LINUX    = 19_u64
+  CLOCK    = 20_u64
 end
 
 module Right

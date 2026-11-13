@@ -110,6 +110,8 @@ module Arch
       mov $$0xc0000080, %ecx
       rdmsr
       or $$(1 << 11), %eax
+      # keep syscall disabled so linux binaries trap into the kernel with #ud
+      and $$~1, %eax
       wrmsr
       mov %cr0, %rax
       or $$((1 << 16) | (1 << 3) | (1 << 2)), %rax
@@ -175,6 +177,7 @@ def exception(frame : UInt64*) : UInt64*
   if frame[Frame::VECTOR] == 14 && frame[Frame::CS] == 0x23 && frame[Frame::ERROR] & 1 == 0
     return frame if Processes.grow(Arch.read_cr2)
   end
+  return frame if frame[Frame::VECTOR] == 6 && frame[Frame::CS] == 0x23 && Processes.bounce(frame)
   Console.write("[Kristal] Exception vector=")
   Console.hex(frame[Frame::VECTOR])
   Console.write(" error=")

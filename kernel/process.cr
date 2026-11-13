@@ -24,6 +24,7 @@ lib Kernel
     wait_pid : UInt64
     wait_buffer : UInt64
     fs_base : UInt64
+    linux : UInt64
   end
 end
 
@@ -140,6 +141,7 @@ module Processes
     child.value.root = Memory.clone_space(parent.value.root)
     child.value.devices = parent.value.devices
     child.value.fs_base = parent.value.fs_base
+    child.value.linux = parent.value.linux
     child.value.parent = parent.value.pid
     IPC.fork(parent, child)
     child.value.state = READY
@@ -162,6 +164,7 @@ module Processes
     Arch.write_cr3(root)
     Memory.destroy_space(old)
     task.value.fs_base = 0_u64
+    task.value.linux = 0_u64
     Arch.write_fs_base(0_u64)
     memset(frame.as(UInt8*), 0, Frame::WORDS.to_u64! &* 8)
     frame[Frame::RIP] = entry.to_u64!
@@ -288,6 +291,26 @@ module Processes
     Arch.write_fs_base(base)
     frame[Frame::RAX] = 0_u64
     frame
+  end
+
+  def self.linux(frame : UInt64*, entry : UInt64) : UInt64*
+    return Syscalls.fail(frame, Errno::EINVAL) if entry >= Layout::END
+    @@current.value.linux = entry
+    frame[Frame::RAX] = 0_u64
+    frame
+  end
+
+  # a syscall instruction continues at the registered entry, rcx and r11 set the way the cpu would
+  def self.bounce(frame : UInt64*) : Bool
+    task = @@current
+    return false if task.value.linux == 0
+    code = 0_u16
+    return false unless Memory.copy_user(task.value.root, frame[Frame::RIP], pointerof(code).as(UInt8*), 2_u64, false)
+    return false if code != 0x050f
+    frame[Frame::RCX] = frame[Frame::RIP] &+ 2
+    frame[Frame::R11] = frame[Frame::FLAGS]
+    frame[Frame::RIP] = task.value.linux
+    true
   end
 
   def self.wait(frame : UInt64*, pid : UInt64, address : UInt64, options : UInt64) : UInt64*

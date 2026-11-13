@@ -52,6 +52,10 @@ module Syscalls
       return Devices.drop(frame, a)
     elsif number == Sys::THREAD
       return Processes.thread(frame, a)
+    elsif number == Sys::LINUX
+      return Processes.linux(frame, a)
+    elsif number == Sys::CLOCK
+      frame[Frame::RAX] = Timer.ticks
     elsif number == Sys::COPY
       return IPC.copy(frame, a, b)
     elsif number == Sys::IRQ
