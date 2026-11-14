@@ -42,6 +42,8 @@ module Processes
   STACK_BASE = 0xfffffe0000000000_u64
   STACK_SIZE =              16384_u64
   @@table = Pointer(Kernel::Process).new(0_u64)
+  @@fpu = Pointer(UInt8).new(0_u64)
+  @@fpu_owner = Pointer(Kernel::Process).new(0_u64)
   @@current = Pointer(Kernel::Process).new(0_u64)
   @@last_pid = 0_u64
   @@slice = 0_u64
@@ -50,6 +52,27 @@ module Processes
   def self.init
     size = MAX &* sizeof(Kernel::Process).to_u64!
     @@table = Memory.alloc_pages((size &+ 4095) >> 12).as(Kernel::Process*)
+    @@fpu = Memory.alloc_pages(MAX &* 512 >> 12).as(UInt8*)
+  end
+
+  def self.fpu(task : Kernel::Process*) : UInt8*
+    @@fpu + (task.value.slot << 9).to_i64!
+  end
+
+  # the registers only change hands when another process actually runs
+  def self.fpu_switch(task : Kernel::Process*)
+    return if @@fpu_owner.address == task.address
+    Arch.fpu_save(fpu(@@fpu_owner)) if @@fpu_owner.address != 0
+    Arch.fpu_load(fpu(task))
+    @@fpu_owner = task
+  end
+
+  def self.fpu_reset(task : Kernel::Process*)
+    @@fpu_owner = Pointer(Kernel::Process).new(0_u64) if @@fpu_owner.address == task.address
+    area = fpu(task)
+    memset(area, 0, 512_u64)
+    area.as(UInt16*).value = 0x37f_u16
+    (area + 24_i64).as(UInt32*).value = 0x1f80_u32
   end
 
   def self.slot(index : UInt64) : Kernel::Process*
@@ -91,6 +114,7 @@ module Processes
         task.value.stack = bottom &+ STACK_SIZE
         task.value.state = SLEEPING
         task.value.wake_tick = 0xffffffffffffffff_u64
+        fpu_reset(task)
         return task
       end
       i = i &+ 1
@@ -142,6 +166,8 @@ module Processes
     child.value.devices = parent.value.devices
     child.value.fs_base = parent.value.fs_base
     child.value.linux = parent.value.linux
+    Arch.fpu_save(fpu(parent)) if @@fpu_owner.address == parent.address
+    memcpy(fpu(child), fpu(parent), 512_u64)
     child.value.parent = parent.value.pid
     IPC.fork(parent, child)
     child.value.state = READY
@@ -166,6 +192,7 @@ module Processes
     task.value.fs_base = 0_u64
     task.value.linux = 0_u64
     Arch.write_fs_base(0_u64)
+    fpu_reset(task)
     memset(frame.as(UInt8*), 0, Frame::WORDS.to_u64! &* 8)
     frame[Frame::RIP] = entry.to_u64!
     frame[Frame::CS] = 0x23_u64
@@ -230,6 +257,7 @@ module Processes
     CPU.set_io(task.value.devices)
     Arch.write_cr3(task.value.root)
     Arch.write_fs_base(task.value.fs_base)
+    fpu_switch(task)
     task.value.frame
   end
 
@@ -428,6 +456,7 @@ module Processes
       i = i &+ 1
     end
     IPC.detach(task)
+    @@fpu_owner = Pointer(Kernel::Process).new(0_u64) if @@fpu_owner.address == task.address
     task.value.state = ZOMBIE
     orphan_wake
     schedule

@@ -75,6 +75,14 @@ module Arch
     asm("wrmsr" :: "{ecx}"(0xc0000100_u32), "{eax}"(value.to_u32!), "{edx}"((value >> 32).to_u32!) :: "volatile")
   end
 
+  def self.fpu_save(area : UInt8*)
+    asm("fxsave64 ($0)" :: "r"(area) : "memory" : "volatile")
+  end
+
+  def self.fpu_load(area : UInt8*)
+    asm("fxrstor64 ($0)" :: "r"(area) : "memory" : "volatile")
+  end
+
   # every stub in entry.cr is padded to 16 bytes
   def self.interrupt_address(index : UInt64) : UInt64
     value = 0_u64
@@ -82,7 +90,6 @@ module Arch
     value &+ (index << 4)
   end
 
-  # fpu and simd state is not switched yet, so those instructions trap
   def self.cpu_load(gdt : UInt64*, idt : UInt64*)
     asm("
       sub $$16, %rsp
@@ -114,8 +121,13 @@ module Arch
       and $$~1, %eax
       wrmsr
       mov %cr0, %rax
-      or $$((1 << 16) | (1 << 3) | (1 << 2)), %rax
+      and $$~((1 << 3) | (1 << 2)), %rax
+      or $$((1 << 16) | (1 << 1)), %rax
       mov %rax, %cr0
+      mov %cr4, %rax
+      or $$((1 << 10) | (1 << 9)), %rax
+      mov %rax, %cr4
+      fninit
     " :: "r"(gdt), "r"(idt) : "rax", "rcx", "rdx", "memory" : "volatile")
   end
 end
