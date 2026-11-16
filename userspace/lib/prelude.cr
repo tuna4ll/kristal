@@ -1,4 +1,5 @@
 require "../../runtime/base"
+require "../../runtime/memory"
 require "../../runtime/abi"
 require "./system"
 require "./text"
