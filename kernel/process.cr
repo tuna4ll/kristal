@@ -25,6 +25,7 @@ lib Kernel
     wait_buffer : UInt64
     fs_base : UInt64
     linux : UInt64
+    group : UInt64
   end
 end
 
@@ -144,6 +145,7 @@ module Processes
     task.value.root = root
     task.value.frame = frame
     task.value.parent = task.value.pid == 1 ? 0_u64 : 1_u64
+    task.value.group = task.value.pid
     task.value.state = READY
     Console.write("[Kristal] Process pid=")
     Console.hex(task.value.pid)
@@ -166,6 +168,7 @@ module Processes
     child.value.devices = parent.value.devices
     child.value.fs_base = parent.value.fs_base
     child.value.linux = parent.value.linux
+    child.value.group = parent.value.group
     Arch.fpu_save(fpu(parent)) if @@fpu_owner.address == parent.address
     memcpy(fpu(child), fpu(parent), 512_u64)
     child.value.parent = parent.value.pid
@@ -318,6 +321,23 @@ module Processes
     @@current.value.fs_base = base
     Arch.write_fs_base(base)
     frame[Frame::RAX] = 0_u64
+    frame
+  end
+
+  # a process may move itself or one of its children into a group
+  def self.set_group(frame : UInt64*, pid : UInt64, group : UInt64) : UInt64*
+    task = pid == 0 ? @@current : find(pid)
+    return Syscalls.fail(frame, Errno::ESRCH) if task.address == 0 || exited?(task)
+    return Syscalls.fail(frame, Errno::ESRCH) if task.address != @@current.address && task.value.parent != @@current.value.pid
+    task.value.group = group == 0 ? task.value.pid : group
+    frame[Frame::RAX] = 0_u64
+    frame
+  end
+
+  def self.get_group(frame : UInt64*, pid : UInt64) : UInt64*
+    task = pid == 0 ? @@current : find(pid)
+    return Syscalls.fail(frame, Errno::ESRCH) if task.address == 0
+    frame[Frame::RAX] = task.value.group
     frame
   end
 

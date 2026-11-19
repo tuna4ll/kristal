@@ -68,8 +68,17 @@ module Linux
       clock(Pointer(Int64).new(a), 1000000_u64)
     elsif number == 102 || number == 104 || number == 107 || number == 108
       0_i64
+    elsif number == 109
+      System.invoke(Sys::SETPGID, a, b)
     elsif number == 110
       System.pid(true)
+    elsif number == 111
+      System.invoke(Sys::GETPGID)
+    elsif number == 112
+      result = System.invoke(Sys::SETPGID)
+      result < 0 ? result : System.pid
+    elsif number == 121 || number == 124
+      System.invoke(Sys::GETPGID, a)
     elsif number == 186 || number == 218
       System.pid
     elsif number == 158 && a == 0x1002

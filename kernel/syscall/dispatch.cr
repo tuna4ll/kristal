@@ -56,6 +56,10 @@ module Syscalls
       return Processes.linux(frame, a)
     elsif number == Sys::CLOCK
       frame[Frame::RAX] = Timer.ticks
+    elsif number == Sys::SETPGID
+      return Processes.set_group(frame, a, b)
+    elsif number == Sys::GETPGID
+      return Processes.get_group(frame, a)
     elsif number == Sys::COPY
       return IPC.copy(frame, a, b)
     elsif number == Sys::IRQ

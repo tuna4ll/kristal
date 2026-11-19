@@ -119,6 +119,8 @@ module Sys
   THREAD   = 18_u64
   LINUX    = 19_u64
   CLOCK    = 20_u64
+  SETPGID  = 21_u64
+  GETPGID  = 22_u64
 end
 
 module Right
