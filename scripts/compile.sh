@@ -4,6 +4,8 @@ src=$1
 out=$2
 model=$3
 shift 3
+# crystal prunes its cache to ten entries, so parallel builds sharing one cache delete each other's files
+export CRYSTAL_CACHE_DIR="$(dirname "$out")/cache/$(basename "$out")"
 crystal build "$src" --prelude=empty --cross-compile --target=x86_64-unknown-none --release --no-debug --emit llvm-ir -o "$out" "$@" > "$out.link.txt"
 # Interrupts may overwrite the SysV red zone; Crystal has no CLI switch for it.
 sed -i -E 's/ uwtable//g; s/(attributes #[0-9]+ = \{)/\1 noredzone/' "$out.ll"
