@@ -302,6 +302,35 @@ module IPC
     task.value.state = Processes::READY
   end
 
+  def self.cancel(task : Kernel::Process*)
+    id = task.value.ipc_endpoint
+    if id != 0
+      ep = endpoint(id)
+      me = task.value.slot &+ 1
+      ep.value.receiver = 0_u64 if task.value.state == Processes::RECEIVING && ep.value.receiver == me
+      if task.value.state == Processes::CALLING && task.value.ipc_served == 0
+        previous = 0_u64
+        current = ep.value.head
+        while current != 0 && current != me
+          previous = current
+          current = Processes.slot(current &- 1).value.ipc_next
+        end
+        if current == me
+          if previous == 0
+            ep.value.head = task.value.ipc_next
+          else
+            Processes.slot(previous &- 1).value.ipc_next = task.value.ipc_next
+          end
+          ep.value.tail = previous if ep.value.tail == me
+        end
+      end
+    end
+    task.value.ipc_endpoint = 0_u64
+    task.value.ipc_next = 0_u64
+    task.value.ipc_served = 0_u64
+    task.value.ipc_cap = 0_u64
+  end
+
   def self.fork(parent : Kernel::Process*, child : Kernel::Process*)
     handle = 1_u64
     while handle <= SLOTS

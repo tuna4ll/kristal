@@ -7,6 +7,7 @@ require "./console/display"
 require "./process"
 require "./ipc"
 require "./devices"
+require "./signals"
 require "./syscall/dispatch"
 require "./elf/loader"
 require "./memory/pages"
@@ -103,6 +104,7 @@ fun kernel_main(hhdm : UInt64*, memmap : UInt64*, modules : UInt64*, framebuffer
   files = Pointer(UInt64).new(modules[2])
   Processes.init
   IPC.init
+  Signals.init
   Console.write("[Kristal] Loading userspace ELF\n")
   Devices.initrd(Pointer(UInt64).new(files[1]))
   Processes.create(Pointer(UInt64).new(files[0]), "init", Device::DISPLAY | Device::SERIAL | Device::KEYBOARD | Device::INITRD)

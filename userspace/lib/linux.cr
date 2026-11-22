@@ -32,8 +32,10 @@ module Linux
       Posix.pipe(Pointer(Int32).new(a), 0_u64)
     elsif number == 10 || number == 28
       0_i64
-    elsif number == 13 || number == 14
-      0_i64
+    elsif number == 13
+      Posix.sigaction(a, path(b), path(c))
+    elsif number == 14
+      Posix.sigprocmask(a, path(b), path(c))
     elsif number == 19
       vector(a, Pointer(UInt64).new(b), c, false)
     elsif number == 20
@@ -46,6 +48,8 @@ module Linux
       Posix.dup2(a, b)
     elsif number == 35
       Posix.nanosleep(Pointer(Int64).new(a))
+    elsif number == 34
+      Posix.pause
     elsif number == 39
       System.pid
     elsif number == 57
@@ -54,6 +58,8 @@ module Linux
       Posix.execve(path(a), Pointer(UInt8*).new(b), Pointer(UInt8*).new(c))
     elsif number == 60 || number == 231
       Posix.exit(a & 255)
+    elsif number == 62
+      Posix.kill(a.to_i64!, b)
     elsif number == 61
       Posix.waitpid(a.to_i64!, Pointer(Int32).new(b), c)
     elsif number == 63
@@ -81,10 +87,18 @@ module Linux
       System.invoke(Sys::GETPGID, a)
     elsif number == 186 || number == 218
       System.pid
+    elsif number == 130
+      Posix.sigsuspend(path(a))
+    elsif number == 131
+      0_i64
     elsif number == 158 && a == 0x1002
       System.invoke(Sys::THREAD, b)
     elsif number == 217
       Posix.getdents(a, path(b), c)
+    elsif number == 200
+      Posix.kill(a.to_i64!, b)
+    elsif number == 234
+      Posix.kill(b.to_i64!, c)
     elsif number == 228
       clock(Pointer(Int64).new(b), 1000000000_u64)
     elsif number == 293

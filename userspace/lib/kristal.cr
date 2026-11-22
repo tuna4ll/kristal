@@ -68,6 +68,8 @@ fun kristal_entry_code
 
     # entered in place of a syscall instruction, rcx holds the return address
     kristal_linux_entry:
+      cmp $$15, %rax
+      je .Lsigreturn
       sub $$128, %rsp
       push %rcx
       push %rdi
@@ -99,6 +101,10 @@ fun kristal_entry_code
       pop %rcx
       add $$128, %rsp
       jmp *%rcx
+    .Lsigreturn:
+      mov %rsp, %rdi
+      mov $$26, %eax
+      int $$0x80
     .popsection
   " :::: "volatile")
 end

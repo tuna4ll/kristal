@@ -4,6 +4,32 @@ module Syscall
     asm("int $$0x80" : "={rax}"(result) : "{rax}"(number), "{rdi}"(a), "{rsi}"(b), "{rdx}"(c), "{r10}"(d), "{r8}"(e), "{r9}"(f) : "memory" : "volatile")
     result
   end
+
+  def self.restorer_address : UInt64
+    value = 0_u64
+    asm("lea signal_restore(%rip), $0" : "=r"(value))
+    value
+  end
+
+  def self.noop_address : UInt64
+    value = 0_u64
+    asm("lea signal_noop(%rip), $0" : "=r"(value))
+    value
+  end
+end
+
+fun signal_code
+  asm("
+    .pushsection .text
+    # a handler returns here, the stack then points at the saved context
+    signal_restore:
+      mov %rsp, %rdi
+      mov $$26, %eax
+      int $$0x80
+    signal_noop:
+      ret
+    .popsection
+  " :::: "volatile")
 end
 
 module System
@@ -69,6 +95,17 @@ module System
 
   def self.sleep(ticks : UInt64) : Int64
     invoke(Sys::SLEEP, ticks)
+  end
+
+  # installs a handler with the restorer every crystal program links in
+  def self.signal(number : UInt64, handler : UInt64) : Int64
+    action = uninitialized UInt64[4]
+    words = pointerof(action).as(UInt64*)
+    words[0] = handler
+    words[1] = 0x04000000_u64
+    words[2] = Syscall.restorer_address
+    words[3] = 0_u64
+    invoke(Sys::SIGACTION, number, words.address, 0_u64)
   end
 
   def self.exit(status : UInt64) : NoReturn

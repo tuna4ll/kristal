@@ -99,28 +99,33 @@ module Wait
 end
 
 module Sys
-  EXIT     =  1_u64
-  SLEEP    =  2_u64
-  WAIT     =  3_u64
-  CALL     =  4_u64
-  RECEIVE  =  5_u64
-  REPLY    =  6_u64
-  DEVICE   =  7_u64
-  ENDPOINT =  8_u64
-  CLOSE    =  9_u64
-  FORK     = 10_u64
-  EXEC     = 11_u64
-  MAP      = 12_u64
-  UNMAP    = 13_u64
-  PID      = 14_u64
-  DROP     = 15_u64
-  IRQ      = 16_u64
-  COPY     = 17_u64
-  THREAD   = 18_u64
-  LINUX    = 19_u64
-  CLOCK    = 20_u64
-  SETPGID  = 21_u64
-  GETPGID  = 22_u64
+  EXIT       =  1_u64
+  SLEEP      =  2_u64
+  WAIT       =  3_u64
+  CALL       =  4_u64
+  RECEIVE    =  5_u64
+  REPLY      =  6_u64
+  DEVICE     =  7_u64
+  ENDPOINT   =  8_u64
+  CLOSE      =  9_u64
+  FORK       = 10_u64
+  EXEC       = 11_u64
+  MAP        = 12_u64
+  UNMAP      = 13_u64
+  PID        = 14_u64
+  DROP       = 15_u64
+  IRQ        = 16_u64
+  COPY       = 17_u64
+  THREAD     = 18_u64
+  LINUX      = 19_u64
+  CLOCK      = 20_u64
+  SETPGID    = 21_u64
+  GETPGID    = 22_u64
+  SIGACTION  = 23_u64
+  SIGMASK    = 24_u64
+  KILL       = 25_u64
+  SIGRETURN  = 26_u64
+  SIGSUSPEND = 27_u64
 end
 
 module Right
@@ -155,6 +160,7 @@ module Errno
   EPERM        =  1_i64
   ENOENT       =  2_i64
   ESRCH        =  3_i64
+  EINTR        =  4_i64
   EIO          =  5_i64
   E2BIG        =  7_i64
   ENOEXEC      =  8_i64

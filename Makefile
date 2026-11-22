@@ -6,7 +6,7 @@ QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display gtk -vg
 RUNTIME := $(wildcard runtime/*.cr userspace/lib/*.cr) scripts/compile.sh
 SBIN := console fs
 BIN := sh echo cat ls uname wc selftest
-CBIN := hello
+CBIN := hello sigtest
 PROGRAMS := $(SBIN) $(BIN) $(CBIN)
 
 .PHONY: all run test clean feasibility

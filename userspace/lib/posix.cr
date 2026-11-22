@@ -124,7 +124,31 @@ module Posix
     memset(pointerof(message).as(UInt8*), 0, 64_u64)
     message.tag = Op::WRITE
     message.length = count
-    request(fd, pointerof(message), buffer, 0_u64)
+    result = request(fd, pointerof(message), buffer, 0_u64)
+    kill(System.pid, 13_u64) if result == 0_i64 &- Errno::EPIPE
+    result
+  end
+
+  def self.sigaction(signal : UInt64, action : UInt8*, previous : UInt8*) : Int64
+    System.invoke(Sys::SIGACTION, signal, action.address, previous.address)
+  end
+
+  def self.sigprocmask(how : UInt64, set : UInt8*, previous : UInt8*) : Int64
+    System.invoke(Sys::SIGMASK, how, set.address, previous.address)
+  end
+
+  def self.kill(pid : Int64, signal : UInt64) : Int64
+    System.invoke(Sys::KILL, pid.to_u64!, signal)
+  end
+
+  def self.sigsuspend(set : UInt8*) : Int64
+    System.invoke(Sys::SIGSUSPEND, set.address)
+  end
+
+  def self.pause : Int64
+    mask = 0_u64
+    sigprocmask(0_u64, Pointer(UInt8).new(0_u64), pointerof(mask).as(UInt8*))
+    sigsuspend(pointerof(mask).as(UInt8*))
   end
 
   def self.error(code : Int64) : Int64
@@ -465,7 +489,8 @@ module Posix
     ticks = time[0].to_u64! &* 100 &+ (time[1].to_u64! &+ 9999999).unsafe_div(10000000_u64)
     while ticks > 0
       step = ticks > 6000 ? 6000_u64 : ticks
-      System.sleep(step)
+      result = System.sleep(step)
+      return result if result < 0
       ticks = ticks &- step
     end
     0_i64

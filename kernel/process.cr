@@ -26,6 +26,11 @@ lib Kernel
     fs_base : UInt64
     linux : UInt64
     group : UInt64
+    signals : UInt64
+    mask : UInt64
+    saved_mask : UInt64
+    suspended : UInt64
+    sender : UInt64
   end
 end
 
@@ -64,6 +69,15 @@ module Processes
   def self.fpu_switch(task : Kernel::Process*)
     return if @@fpu_owner.address == task.address
     Arch.fpu_save(fpu(@@fpu_owner)) if @@fpu_owner.address != 0
+    Arch.fpu_load(fpu(task))
+    @@fpu_owner = task
+  end
+
+  def self.fpu_flush(task : Kernel::Process*)
+    Arch.fpu_save(fpu(task)) if @@fpu_owner.address == task.address
+  end
+
+  def self.fpu_reload(task : Kernel::Process*)
     Arch.fpu_load(fpu(task))
     @@fpu_owner = task
   end
@@ -116,6 +130,7 @@ module Processes
         task.value.state = SLEEPING
         task.value.wake_tick = 0xffffffffffffffff_u64
         fpu_reset(task)
+        Signals.reset(task, false)
         return task
       end
       i = i &+ 1
@@ -173,6 +188,7 @@ module Processes
     memcpy(fpu(child), fpu(parent), 512_u64)
     child.value.parent = parent.value.pid
     IPC.fork(parent, child)
+    Signals.fork(parent, child)
     child.value.state = READY
     frame[Frame::RAX] = child.value.pid
     frame
@@ -196,6 +212,7 @@ module Processes
     task.value.linux = 0_u64
     Arch.write_fs_base(0_u64)
     fpu_reset(task)
+    Signals.reset(task, true)
     memset(frame.as(UInt8*), 0, Frame::WORDS.to_u64! &* 8)
     frame[Frame::RIP] = entry.to_u64!
     frame[Frame::CS] = 0x23_u64
@@ -390,6 +407,16 @@ module Processes
     block(frame, WAITING)
   end
 
+  # a signal cuts a blocking call short with EINTR
+  def self.interrupt(task : Kernel::Process*)
+    state = task.value.state
+    return unless state == SLEEPING || state == WAITING || state == CALLING || state == RECEIVING
+    IPC.cancel(task) if state == CALLING || state == RECEIVING
+    task.value.wait_pid = 0_u64
+    task.value.frame[Frame::RAX] = (0_i64 &- Errno::EINTR).to_u64!
+    task.value.state = READY
+  end
+
   def self.wake_sleepers
     i = 0_u64
     while i < MAX
@@ -467,6 +494,7 @@ module Processes
       parent.value.state = READY
       task.value.collected = 1_u64
     end
+    Signals.post(parent, Signals::CHLD, task.value.pid) if parent.address != 0
     i = 0_u64
     while i < MAX
       child = slot(i)

@@ -79,6 +79,10 @@ end
 
 fun interrupt_dispatch(frame : UInt64*) : UInt64*
   Processes.reap
+  Signals.deliver(handle(frame))
+end
+
+def handle(frame : UInt64*) : UInt64*
   vector = frame[Frame::VECTOR]
   if vector == 128
     return Syscalls.dispatch(frame)

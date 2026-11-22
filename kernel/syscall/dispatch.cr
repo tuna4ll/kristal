@@ -60,6 +60,16 @@ module Syscalls
       return Processes.set_group(frame, a, b)
     elsif number == Sys::GETPGID
       return Processes.get_group(frame, a)
+    elsif number == Sys::SIGACTION
+      return Signals.sigaction(frame, a, b, c)
+    elsif number == Sys::SIGMASK
+      return Signals.sigmask(frame, a, b, c)
+    elsif number == Sys::KILL
+      return Signals.kill(frame, a.to_i64!, b)
+    elsif number == Sys::SIGRETURN
+      return Signals.sigreturn(frame, a)
+    elsif number == Sys::SIGSUSPEND
+      return Signals.suspend(frame, a)
     elsif number == Sys::COPY
       return IPC.copy(frame, a, b)
     elsif number == Sys::IRQ

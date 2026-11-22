@@ -203,7 +203,7 @@ def exception(frame : UInt64*) : UInt64*
   Console.write("\n")
   vector = frame[Frame::VECTOR]
   if frame[Frame::CS] == 0x23 && vector != 2 && vector != 8 && vector != 18
-    return Processes.exit(signal(vector))
+    return Signals.fault(frame, signal(vector))
   end
   Arch.debug_exit(0x11_u32)
   Arch.stop
