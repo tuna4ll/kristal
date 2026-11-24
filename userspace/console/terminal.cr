@@ -14,7 +14,7 @@ module Terminal
   @@count = 0_u64
   @@waiting = 0_u64
   @@eof = false
-  @@group = 1_u32
+  @@group = 0_u32
 
   def self.termios : UInt8*
     pointerof(@@termios).as(UInt8*)
@@ -64,17 +64,22 @@ module Terminal
 
   def self.key(value : UInt8)
     value = 10_u8 if value == 13 && termios.as(UInt32*)[0] & ICRNL != 0
+    if local & ISIG != 0 && (value == 3 || value == 26 || value == 28)
+      echo(94_u8)
+      echo(value &+ 64_u8)
+      echo(10_u8)
+      @@length = 0_u64
+      # ^c, ^z and ^\ go to the foreground group the shell picked with tcsetpgrp
+      signal = value == 3 ? 2_u64 : (value == 26 ? 20_u64 : 3_u64)
+      Posix.kill(0_i64 &- @@group.to_i64!, signal) if @@group > 1
+      return
+    end
     if local & ICANON == 0
       echo(value)
       queue(value)
       return
     end
-    if value == 3 && local & ISIG != 0
-      echo(94_u8)
-      echo(67_u8)
-      echo(10_u8)
-      @@length = 0_u64
-    elsif value == 4
+    if value == 4
       @@eof = true if @@length == 0
       commit
     elsif value == 8 || value == 127
@@ -109,6 +114,14 @@ module Terminal
   end
 
   # moves up to count bytes of finished input into target
+  # gives back input a reader went away from before it was answered
+  def self.untake(source : UInt8*, count : UInt64)
+    count = 4096_u64 &- @@count if count > 4096_u64 &- @@count
+    memmove(ready + count.to_i64!, ready, @@count)
+    memcpy(ready, source, count)
+    @@count = @@count &+ count
+  end
+
   def self.take(target : UInt8*, count : UInt64) : UInt64
     @@eof = false if @@count == 0
     count = @@count if count > @@count
@@ -128,7 +141,7 @@ module Terminal
       memset(message.as(UInt8*), 0, 64_u64)
       message.value.tag = count
       message.value.length = count
-      System.reply(service, pid, message, data)
+      untake(data, count) if System.reply(service, pid, message, data) < 0
     end
   end
 

@@ -14,7 +14,8 @@ QEMU = [
 
 PROMPT = "$ "
 
-# each command is typed into the shell and must print the expected text before the next prompt
+# each command is typed into the shell and must print the expected text before the next prompt,
+# a third entry is typed raw once the command is running
 STEPS = [
     ("echo hello kristal", "hello kristal"),
     ("cat /etc/motd", "Welcome to Kristal."),
@@ -26,13 +27,16 @@ STEPS = [
     ("cd ..", ""),
     ("uname -a", "Kristal kristal 0.1 microkernel x86_64"),
     ("echo $HOME '$HOME' \"$PATH\"", "/ $HOME /bin:/sbin"),
-    ("ls /bin | cat | wc -l", "9"),
+    ("ls /bin | cat | wc -l", "10"),
     ("echo one two|cat|cat", "one two"),
     ("cat /bin/sh | cat | wc -c", str(os.path.getsize("build/initrd/bin/sh"))),
     ("cat < /etc/motd | wc -w", "3"),
     ("hello", "motd: Welcome to Kristal."),
     ("hello | wc -l", "6"),
     ("sigtest", "fault killed by 11"),
+    ("sleep 50", "^C", "\x03"),
+    ("echo $?", "130"),
+    ("sleep 50 | cat", "^C", "\x03"),
     ("nosuch", "sh: nosuch: not found"),
     ("echo $?", "127"),
     ("selftest", "selftest: exiting"),
@@ -67,8 +71,8 @@ class Machine:
             time.sleep(0.02)
         return False
 
-    def send(self, line):
-        self.process.stdin.write(line.encode() + b"\r")
+    def send(self, line, end=b"\r"):
+        self.process.stdin.write(line.encode() + end)
         self.process.stdin.flush()
 
 
@@ -78,11 +82,14 @@ def main():
     if not machine.expect(PROMPT, 30):
         failures.append("no shell prompt")
     else:
-        for command, expected in STEPS:
+        for command, expected, *keys in STEPS:
             machine.send(command)
             if not machine.expect(command):
                 failures.append(f"{command!r} was not echoed")
                 break
+            for key in keys:
+                time.sleep(0.5)
+                machine.send(key, end=b"")
             if expected and not machine.expect(expected):
                 failures.append(f"{command!r} did not print {expected!r}")
             if not machine.expect(PROMPT):

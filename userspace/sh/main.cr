@@ -36,6 +36,12 @@ module Shell
     pointerof(@@outputs).as(UInt8**)
   end
 
+  # the terminal sends ^c to whichever group is handed the foreground here
+  def self.foreground(group : UInt64)
+    value = group.to_u32!
+    Posix.ioctl(0_u64, 0x5410_u64, pointerof(value).as(UInt8*))
+  end
+
   def self.status : UInt64
     @@status
   end
@@ -50,6 +56,11 @@ module Shell
     length = 0_u64
     while length < 1023
       count = Posix.read(0_u64, line + length.to_i64!, 1023_u64 &- length)
+      if count == 0_i64 &- Errno::EINTR
+        @@status = 130_u64
+        length = 0_u64
+        break
+      end
       return false if count <= 0 && length == 0
       break if count <= 0
       length = length &+ count.to_u64!
@@ -280,6 +291,9 @@ module Shell
       if stage == 0 || stage <= made
         pid = Posix.fork
         if pid == 0
+          System.invoke(Sys::SETPGID, 0_u64, children[0].to_u64!)
+          System.signal(2_u64, 0_u64)
+          System.signal(3_u64, 0_u64)
           Posix.dup2(pipes[(stage &- 1) << 1].to_u64!, 0_u64) if stage > 0
           Posix.dup2(pipes[(stage << 1) &+ 1].to_u64!, 1_u64) if stage < made
           i = 0_u64
@@ -291,6 +305,7 @@ module Shell
         end
         fail(args[starts[stage]], pid) if pid < 0
         children[stage] = pid
+        System.invoke(Sys::SETPGID, pid.to_u64!, children[0].to_u64!) if pid > 0
       end
       stage = stage &+ 1
     end
@@ -299,6 +314,7 @@ module Shell
       Posix.close(pipes[i].to_u64!)
       i = i &+ 1
     end
+    foreground(children[0].to_u64!) if children[0] > 0
     @@status = 1_u64
     stage = 0_u64
     while stage < stages
@@ -309,10 +325,15 @@ module Shell
       end
       stage = stage &+ 1
     end
+    foreground(System.pid.to_u64!)
   end
 end
 
 def main(argc : UInt64, argv : UInt8**) : Int32
+  System.invoke(Sys::SETPGID)
+  Shell.foreground(System.pid.to_u64!)
+  System.signal(2_u64, Syscall.noop_address)
+  System.signal(3_u64, 1_u64)
   while true
     Shell.prompt
     break unless Shell.read_line

@@ -5,7 +5,7 @@ MUSL := build/musl
 QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display gtk -vga std -serial stdio -monitor none -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04 -debugcon file:build/kernel.log
 RUNTIME := $(wildcard runtime/*.cr userspace/lib/*.cr) scripts/compile.sh
 SBIN := console fs
-BIN := sh echo cat ls uname wc selftest
+BIN := sh echo cat ls uname wc sleep selftest
 CBIN := hello sigtest
 PROGRAMS := $(SBIN) $(BIN) $(CBIN)
 
