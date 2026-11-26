@@ -1,4 +1,4 @@
-require "../lib/prelude"
+require "../../lib/prelude"
 
 def main(argc : UInt64, argv : UInt8**) : Int32
   info = uninitialized UInt8[390]

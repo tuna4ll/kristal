@@ -1,4 +1,4 @@
-require "../lib/prelude"
+require "../../lib/prelude"
 
 def copy(fd : UInt64) : Bool
   buffer = uninitialized UInt8[4096]

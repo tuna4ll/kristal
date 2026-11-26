@@ -5,7 +5,8 @@ MUSL := build/musl
 QEMU := qemu-system-x86_64 -machine q35 -cpu qemu64,+nx -m 128M -display gtk -vga std -serial stdio -monitor none -no-reboot -device isa-debug-exit,iobase=0xf4,iosize=0x04 -debugcon file:build/kernel.log
 RUNTIME := $(wildcard runtime/*.cr userspace/lib/*.cr) scripts/compile.sh
 SBIN := console fs
-BIN := sh echo cat ls uname wc sleep selftest
+UTILS := cat echo ls uname wc sleep
+BIN := sh selftest $(UTILS)
 CBIN := hello sigtest
 PROGRAMS := $(SBIN) $(BIN) $(CBIN)
 
@@ -54,6 +55,9 @@ $(CBIN:%=build/%.elf): build/%.elf: build/%.c.o build/kristal.o
 	test -z "$$(nm -u $@ | grep -v ' _DYNAMIC$$')"
 
 build/%.o: userspace/%/main.cr $$(wildcard userspace/%/*.cr) $(RUNTIME) | build
+	scripts/compile.sh $< build/$* small
+
+build/%.o: userspace/kristalutils/%/main.cr $(RUNTIME) | build
 	scripts/compile.sh $< build/$* small
 
 build/console.o: kernel/console/font.bin

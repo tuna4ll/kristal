@@ -1,4 +1,4 @@
-require "../lib/prelude"
+require "../../lib/prelude"
 
 def mode(value : UInt32)
   kind = value & Mode::TYPE
